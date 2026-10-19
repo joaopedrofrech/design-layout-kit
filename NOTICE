@@ -1,0 +1,18 @@
+Third-party material shipped in this repository
+===============================================
+
+assets/fonts/Poppins-*.ttf
+  Poppins, Copyright 2020 The Poppins Project Authors (https://github.com/itfoundry/Poppins).
+  Licensed under the SIL Open Font License 1.1 — see assets/fonts/OFL-Poppins.txt.
+
+assets/profiles/FOGRA39L_coated.icc
+  FOGRA39L Coated ICC profile (Fogra / ECI), as distributed with the TeX Live
+  "colorprofiles" package. The profile's own copyright tag reads:
+  "This profile is free of known copyright restrictions".
+  If you need an authoritative copy, download it from the ECI (eci.org) or
+  install TeX Live's colorprofiles package, and replace this file.
+
+assets/images/placeholder.jpg
+  Generated gradient, no third-party content.
+
+Everything else (code, docs): MIT, see LICENSE.
