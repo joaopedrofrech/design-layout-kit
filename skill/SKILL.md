@@ -21,7 +21,6 @@ kit-<client>-<project>-<size>/        e.g. kit-recanto-do-tambaqui-cardapio-a4
   lib/core.py             pipeline: targets, versions, bleed, color, images, naming, web optimize
   lib/check.py            checks any PDF (fonts, vector text, Unicode map, CMYK-only, dpi)
   lib/export_x1a.py       CMYK PDF -> PDF/X-1a:2001
-  tests/test_pipeline.py  stdlib unittest suite (python3 -m unittest, ~25 s)
   assets/{images,fonts,profiles}/   (profiles/FOGRA39L_coated.icc)
   dist/v<N>/              generated PDFs (committing them is the user's choice)
 ```
@@ -55,7 +54,7 @@ When the reportlab PDF is clean (DeviceCMYK/Gray only, fonts embedded, no transp
 - Honesty: this is a structural self-check, NOT a certification; recommend the printer's preflight (Acrobat Pro, callas pdfToolbox, PitStop). With `bleed_mm > 0` the page is larger and Trim/BleedBox are set; the layout must extend backgrounds into the bleed; crop marks are not drawn. X-4 / PDF/A were not tested.
 
 ## 6. Workflow
-1. Inventory attachments (`pdftoppm -r 100`, `pdfimages -j`, `pdffonts`). 2. Gather content BEFORE drawing; write `content.yaml`. 3. Write `draw()` for the reference layout. 4. Preview (`pdftoppm -r 90`) and check: cut text, overlaps, unbalanced columns, contrast (dark text on mid orange fails: lighten the background), orphan words. 5. Send the first draft early; iterate only on what the user points out. 6. Build all targets, run the checks of sections 4–5 (`python3 lib/check.py`), run `python3 -m unittest` if `lib/` changed, send the PDFs from `dist/` and the kit zip (with `dist/` filled), and say in one line what was not possible (low-res photo, missing price).
+1. Inventory attachments (`pdftoppm -r 100`, `pdfimages -j`, `pdffonts`). 2. Gather content BEFORE drawing; write `content.yaml`. 3. Write `draw()` for the reference layout. 4. Preview (`pdftoppm -r 90`) and check: cut text, overlaps, unbalanced columns, contrast (dark text on mid orange fails: lighten the background), orphan words. 5. Send the first draft early; iterate only on what the user points out. 6. Build all targets, run the checks of sections 4–5 (`python3 lib/check.py`), send the PDFs from `dist/` and the kit zip (with `dist/` filled), and say in one line what was not possible (low-res photo, missing price).
 Never say "print-ready" without running the checks.
 
 ## 7. Content review (before final delivery; if asked, only report and wait for approval before editing)
