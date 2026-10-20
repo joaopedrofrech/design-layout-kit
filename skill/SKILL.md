@@ -34,10 +34,10 @@ kit-<client>-<project>-<size>/        e.g. kit-recanto-do-tambaqui-cardapio-a4
 ## 3. Targets and output names (`dist/v<N>/<slug>-v<N>-<color>-<dpi>dpi[-<variant>].pdf`)
 | target | file | purpose |
 |---|---|---|
-| print | `<slug>-cmyk-fogra39-300dpi.pdf` | pure, editable (CMYK) |
-| print | `<slug>-cmyk-fogra39-300dpi-pdfx1a.pdf` | PDF/X-1a, goes to the printer |
-| web | `<slug>-rgb-300dpi.pdf` | pure, editable (sRGB) |
-| web | `<slug>-rgb-150dpi-web.pdf` | optimized: images at `web.dpi`, JPEG `web.quality`, linearized |
+| print | `<slug>-v<N>-cmyk-fogra39-300dpi.pdf` | pure, editable (CMYK) |
+| print | `<slug>-v<N>-cmyk-fogra39-300dpi-pdfx1a.pdf` | PDF/X-1a, goes to the printer |
+| web | `<slug>-v<N>-rgb-300dpi.pdf` | pure, editable (sRGB) |
+| web | `<slug>-v<N>-rgb-150dpi-web.pdf` | optimized: images at `web.dpi`, JPEG `web.quality`, linearized |
 Versioning: iterate on the same `version`; bump when a new version goes to the client. A full run cleans only `dist/v<N>/` (older versions stay); `--target` replaces only its own files. Hyphens only, lowercase, no accents in names. All four files build in seconds.
 
 ## 4. Technical rules
@@ -51,7 +51,7 @@ Versioning: iterate on the same `version`; bump when a new version goes to the c
 When the reportlab PDF is clean (DeviceCMYK/Gray only, fonts embedded, no transparency), reprocess nothing; only ADD: TrimBox/BleedBox per page (Trim = Media when bleed 0), ICC stream (`N=4`, `Alternate=DeviceCMYK`), `OutputIntents[0]` = {Type OutputIntent, S GTS_PDFX, OutputCondition and Info "Coated FOGRA39 (ISO 12647-2:2004)", OutputConditionIdentifier "FOGRA39", RegistryName http://www.color.org, DestOutputProfile}, docinfo `GTS_PDFXVersion` "PDF/X-1:2001", `GTS_PDFXConformance` "PDF/X-1a:2001", `Trapped` = `pikepdf.Name('/False')` (NOT `Name.False_`), Title, Author, then `pdf.save(min_version='1.3', force_version='1.3', object_stream_mode=disable, compress_streams=True, deterministic_id=True)`. Measured on a real menu: identical text with accents, 5/5 images byte-identical, 0 pixels different at 300 dpi, 0.2 s.
 - Reject the direct method if you find: `rg/RG` operators, non-DeviceCMYK/Gray images, SMask or ExtGState alpha, named ColorSpace. Then Ghostscript fallback (only for third-party PDFs; tell the user it rewrites fonts and recompresses JPEGs; keep the original as the editable one): `.ps` with GTS keys + OutputIntent + embedded ICC N=4, NOT named PDFX_def.ps; run with `-dNOSAFER -dCompatibilityLevel=1.3 -sColorConversionStrategy=CMYK -sProcessColorModel=DeviceCMYK -dDownsampleColorImages=false` (never `-dColorImageDownsampleType=/None`); then add TrimBox with pikepdf.
 - Final report to the user: version 1.3; GTS keys; Trapped False; OutputIntent FOGRA39 with N=4 profile; /ID; TrimBox on all pages; fonts embedded; only CMYK/Gray; zero rg/RG; no transparency; not encrypted. Compare with the pure PDF: `pdftotext` identical, `pdfimages -all` md5 equal, `pdftoppm -r 300` zero different pixels.
-- Ghostscript on a PDF with transparency can flatten whole pages into images (no text, no fonts) while an old checklist still said "ok": the checklist must fail when no vector text exists (`lib/check.py` and the X-1a report do).
+- Ghostscript on a PDF with transparency can flatten whole pages into images (no text, no fonts): every checklist must fail when no vector text exists (`lib/check.py` and the X-1a report do).
 - Honesty: this is a structural self-check, NOT a certification; recommend the printer's preflight (Acrobat Pro, callas pdfToolbox, PitStop). With `bleed_mm > 0` the page is larger and Trim/BleedBox are set; the layout must extend backgrounds into the bleed; crop marks are not drawn. X-4 / PDF/A were not tested.
 
 ## 6. Workflow
