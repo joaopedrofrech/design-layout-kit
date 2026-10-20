@@ -1,6 +1,21 @@
 # pdf-layout-starter
 
-Starter kit for PDFs where you want layout control and cheap future edits: content in `content.yaml`, layout in `build.py`, one command to generate print and web files.
+A project template for PDFs where layout matters (menus, flyers, price lists, catalogs, one-pagers) and the content changes over time.
+
+**What it is:** a small Python pipeline that builds the PDF from two separate things:
+- `content.yaml` — all text, prices, photo names, colors and settings (size, bleed, targets, version).
+- `build.py` — the layout only: fonts and `draw()`, which positions everything on the page.
+
+**What you get:** one command generates every file you need, always editable (vector text, fonts embedded, opens in Affinity, Illustrator and Acrobat):
+- print: CMYK (FOGRA39), 300 dpi, plus a PDF/X-1a for the printer;
+- web: sRGB, a pure 300 dpi file plus a light 150 dpi optimized one.
+
+Every output is checked automatically, and each delivery gets its own versioned folder (`dist/v1/`, `dist/v2/`, …).
+
+## How to edit
+Most changes only touch `content.yaml`; the layout stays untouched. Two ways, same result:
+- **By hand:** open `content.yaml`, change a price, text, item or photo name, save, run `python3 build.py`.
+- **With an AI agent:** ask in plain language ("raise the fish prices by 5%", "swap the cover photo", "add a new section"). The agent edits `content.yaml` (or `build.py` only if the layout changes), runs the build, reads the warnings and sends you the PDFs to review. `AGENTS.md` holds the rules it follows.
 
 ## Use
 ```
@@ -32,7 +47,7 @@ Every output is checked right after the build (fonts embedded, vector text prese
 `bleed_mm: 3` makes the PDF page larger (trim + 3 mm each side) with the origin at the trim corner. `draw()` keeps using `ctx.page_size` (trim size); extend full-page backgrounds by `ctx.bleed`. X-1a gets `TrimBox`/`BleedBox` accordingly. Crop marks are not drawn (printers add them).
 
 ## Start a new project
-1. Copy this folder and name it `kit-<client>-<project>-<size>` (e.g. `kit-recanto-do-tambaqui-cardapio-a4`).
+1. Copy this folder and name it `kit-<client>-<project>-<size>` (e.g. `kit-acme-menu-a4`).
 2. Set `slug` (same name without `kit-`), `title`, `author`, `client`, `lang`, `targets`, `page` (any size), `colors` in `content.yaml`.
 3. Replace `draw()` in `build.py` with the real layout (keep `run(...)` at the bottom) and the example keys in `content.yaml` with the real content.
 4. Put fonts in `assets/fonts/` (register them in `build.py`) and images in `assets/images/`.
