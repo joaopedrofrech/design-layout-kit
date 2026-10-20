@@ -15,11 +15,15 @@ ctx (passed to draw):
     ctx.P(*parts)    path relative to the project folder
     ctx.make_image(PIL image, w_pt, h_pt, photo=True) -> temp JPEG path ready for drawImage
     ctx.warn(msg)    collected and printed after each output
-    ctx.page_size    (width, height) in points
+    ctx.page_size    (width, height) of the TRIM size in points (draw as if there were no bleed)
+    ctx.bleed        bleed in points (0 by default); with bleed_mm > 0 the PDF page is larger and the origin
+                     is already shifted, so extend full-page backgrounds by ctx.bleed on every side
+    ctx.version      project version (content.yaml `version`), outputs go to dist/v<version>/
 """
 import argparse
 import glob
 import os
+import re
 import sys
 import tempfile
 from types import SimpleNamespace
@@ -76,6 +80,9 @@ class Ctx:
         pg = D.get("page")
         if pg:
             self.page_size = (pg["width_mm"] * MM, pg["height_mm"] * MM)
+        self.bleed = float(D.get("bleed_mm", 0)) * MM
+        self.full_size = (self.page_size[0] + 2 * self.bleed, self.page_size[1] + 2 * self.bleed)
+        self.version = int(D.get("version", 1))
         icc = os.path.join(base, "assets", "profiles", "FOGRA39L_coated.icc")
         srgb = ImageCms.createProfile("sRGB")
         fogra = ImageCms.getOpenProfile(icc)
@@ -128,6 +135,40 @@ class Ctx:
         return path
 
 
+class BleedCanvas(canvas.Canvas):
+    """Canvas whose origin sits at the trim corner: the page is larger by `bleed` on every side."""
+
+    def __init__(self, *a, bleed=0.0, **k):
+        super().__init__(*a, **k)
+        self._shift = f"1 0 0 1 {bleed:.4f} {bleed:.4f} cm"
+        self._code.append(self._shift)
+
+    def showPage(self):
+        super().showPage()
+        self._code.append(self._shift)
+
+    def save(self):
+        if self._code == [self._shift]:      # no content after the last showPage: avoid a blank page
+            self._code = []
+        super().save()
+
+
+def bump_version(content_path):
+    """Increase `version:` in the content file (inserting it after `slug:` if missing)."""
+    with open(content_path, encoding="utf-8") as f:
+        text = f.read()
+    m = re.search(r"(?m)^version:\s*(\d+)", text)
+    if m:
+        new = int(m.group(1)) + 1
+        text = text[:m.start()] + f"version: {new}" + text[m.end():]
+    else:
+        new = 2
+        text = re.sub(r"(?m)^(slug:[^\n]*\n)", r"\1version: 2\n", text, count=1)
+    with open(content_path, "w", encoding="utf-8") as f:
+        f.write(text)
+    return new
+
+
 def optimize_web(path, D):
     """Lossless structure compression + linearization ('fast web view'). Images/fonts untouched."""
     import pikepdf
@@ -145,8 +186,12 @@ def run(draw, base_dir, font, validate=None):
     ap.add_argument("--target", choices=["print", "web"],
                     help="build only this target (default: every target in 'targets' of the content file)")
     ap.add_argument("--content", default=os.path.join(base_dir, "content.yaml"))
+    ap.add_argument("--bump", action="store_true",
+                    help="increase `version` in the content file first (new dist/v<N>/ folder)")
     args = ap.parse_args()
 
+    if args.bump:
+        print(f"Version bumped to v{bump_version(args.content)}")
     D = load_content(args.content)
     errors = base_errors(D) + (validate(D) if validate else [])
     if errors:
@@ -156,9 +201,9 @@ def run(draw, base_dir, font, validate=None):
     ctx = Ctx(D, base_dir)
     if not D.get("author"):
         print("  • 'author' is empty in content.yaml (PDF metadata): ask who signs the file.")
-    dist = os.path.join(base_dir, "dist")
+    dist = os.path.join(base_dir, "dist", f"v{ctx.version}")
     os.makedirs(dist, exist_ok=True)
-    if not args.target:                       # full run: dist/ is cleaned
+    if not args.target:                       # full run: only dist/v<version>/ is cleaned
         for old in glob.glob(os.path.join(dist, "*.pdf")):
             os.remove(old)
 
@@ -166,12 +211,13 @@ def run(draw, base_dir, font, validate=None):
     todo = [o for t in targets for o in outputs(t, D.get("web"))]
     for out in todo:
         ctx.use(out)
-        path = os.path.join(dist, f"{D['slug']}-{out.suffix}.pdf")
+        path = os.path.join(dist, f"{D['slug']}-v{ctx.version}-{out.suffix}.pdf")
         for old in (path, path[:-4] + "-pdfx1a.pdf"):     # replace only what is rebuilt
             if os.path.exists(old):
                 os.remove(old)
-        c = canvas.Canvas(path, pagesize=ctx.page_size, initialFontName=font, initialFontSize=10,
-                          enforceColorSpace=out.mode)   # errors if a wrong color space slips in
+        kw = dict(pagesize=ctx.full_size, initialFontName=font, initialFontSize=10,
+                  enforceColorSpace=out.mode)           # errors if a wrong color space slips in
+        c = BleedCanvas(path, bleed=ctx.bleed, **kw) if ctx.bleed else canvas.Canvas(path, **kw)
         c.setTitle(D["title"])
         c.setAuthor(D.get("author", ""))
         c.setSubject(D.get("client", ""))
@@ -183,6 +229,15 @@ def run(draw, base_dir, font, validate=None):
         print(f"OK  {os.path.basename(path)}")
         for w in ctx.warnings:
             print("  •", w)
+        sys.path.insert(0, base_dir)
+        from lib.check import check, failed
+        results = check(path, out.mode, min_dpi=299 if out.up else None,
+                        max_dpi=out.dpi + 1 if out.down else None)
+        for name, status, detail in results:
+            if status == "FAIL":
+                print(f"  [FAIL]  {name} {detail}")
+        if failed(results):
+            sys.exit("Output check failed — see above.")
         if out.x1a and D.get("x1a", True):
             sys.path.insert(0, base_dir)
             from lib.export_x1a import export
@@ -192,6 +247,6 @@ def run(draw, base_dir, font, validate=None):
             if not ok:
                 sys.exit("PDF/X-1a check failed — see report above.")
 
-    print("\nFiles in dist/:")
+    print(f"\nFiles in dist/v{ctx.version}/:")
     for p in made:
         print(f"  {os.path.getsize(p) / 1e6:6.2f} MB   {os.path.basename(p)}")

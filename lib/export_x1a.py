@@ -168,14 +168,17 @@ def report(dst):
             ("Not encrypted", not p.is_encrypted),
         ]
         fonts_ok = trim_ok = True
+        n_fonts = 0
         for pg in p.pages:
             trim_ok &= "/TrimBox" in pg
             for _, f in (pg.Resources.get("/Font") or {}).items():
+                n_fonts += 1
                 d = f.get("/FontDescriptor")
                 if d is None and "/DescendantFonts" in f:
                     d = f.DescendantFonts[0].FontDescriptor
                 fonts_ok &= d is not None and any(k in d for k in ("/FontFile", "/FontFile2", "/FontFile3"))
-        checks += [("TrimBox on every page", trim_ok), ("All fonts embedded", fonts_ok)]
+        checks += [("TrimBox on every page", trim_ok), ("All fonts embedded", fonts_ok),
+                   ("Vector text present (page not rasterized)", n_fonts > 0)]
         if not fonts_ok:
             print("      · unembedded font (reportlab: Canvas(initialFontName='YourRegisteredFont')).")
         issues = analyze(p)
@@ -200,7 +203,8 @@ def export(src, dst, title=None, author="", bleed_mm=0.0, force_gs=False):
         issues = analyze(s)
     if issues or force_gs:
         print("Method: Ghostscript fallback (X-1a-blocking items):", *issues, sep="\n   - ")
-        print("   WARNING: Ghostscript recompresses photos and may lose accents' Unicode map. "
+        print("   WARNING: Ghostscript recompresses photos, may lose accents' Unicode map and, "
+              "with transparency, may flatten whole pages into images (no text left). "
               "Keep the original as the editable version.")
         ghostscript(src, dst, title, author, bleed_mm)
     else:

@@ -44,8 +44,9 @@ def draw(c, ctx):
     M = 40
 
     # header bar
+    bl = ctx.bleed                       # 0 unless bleed_mm > 0: extend backgrounds past the trim edge
     c.setFillColor(K.primary)
-    c.rect(0, H - 60, W, 60, stroke=0, fill=1)
+    c.rect(-bl, H - 60, W + 2 * bl, 60 + bl, stroke=0, fill=1)
     c.setFillColor(ctx.white)
     c.setFont("BodyBd", 12)
     c.drawString(M, H - 36, D["header"])

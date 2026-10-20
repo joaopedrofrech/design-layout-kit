@@ -18,25 +18,27 @@ kit-<client>-<project>-<size>/        e.g. kit-recanto-do-tambaqui-cardapio-a4
   README.md  AGENTS.md  requirements.txt  .gitignore
   content.yaml            ALL text, prices, photo names, colors (YAML keys in English)
   build.py                layout only: fonts, validate(), draw(c, ctx), run(...)
-  lib/core.py             pipeline: targets, color, images, naming, web optimize
+  lib/core.py             pipeline: targets, versions, bleed, color, images, naming, web optimize
+  lib/check.py            checks any PDF (fonts, vector text, Unicode map, CMYK-only, dpi)
   lib/export_x1a.py       CMYK PDF -> PDF/X-1a:2001
+  tests/test_pipeline.py  stdlib unittest suite (python3 -m unittest, ~25 s)
   assets/{images,fonts,profiles}/   (profiles/FOGRA39L_coated.icc)
-  dist/                   generated PDFs
+  dist/v<N>/              generated PDFs (committing them is the user's choice)
 ```
 - `README.md` is for humans (install, build, edit, ~15 lines). `AGENTS.md` is for AIs (rules, block types, hard rules, what not to touch, "after the build send the PDFs from dist/ to the user for preview").
 - `lib/core.py` holds everything that is not layout, so each project only rewrites `draw(c, ctx)`: `ctx.D` content, `ctx.K` colors already in the output color space, `ctx.make_image(img, w_pt, h_pt, photo=True)` returns a JPEG path ready for drawImage, `ctx.warn()`, `ctx.out` (mode, dpi), `ctx.page_size`. It also sets PDF Title/Author/Subject/Lang from the content.
-- `content.yaml` top level: `slug` (= folder name without `kit-`, i.e. `<client>-<project>-<size>`), `title`, `author`, `client`, `lang`, `targets: [print, web]` (deliverables of the project, set once), `bleed_mm`, `page {width_mm,height_mm}`, `web {dpi: 150, quality: 80}`, `colors` (sRGB hex) + content keys. Quote every string, indent with spaces. Content is never hardcoded in `build.py`. `pip install -r requirements.txt` (reportlab, pillow, pikepdf, pyyaml).
-- `build.py` validates content (missing keys, missing image files, unknown blocks) and prints WARNINGS: column overflow, photo below target dpi. CLI: `python3 build.py` builds every target in `targets`; `--target print|web` is only a one-off partial run; `--content file.yaml`.
+- `content.yaml` top level: `slug` (= folder name without `kit-`, i.e. `<client>-<project>-<size>`), `version` (delivery version, default 1), `title`, `author`, `client`, `lang`, `targets: [print, web]` (deliverables of the project, set once), `bleed_mm` (real bleed: the page grows, `ctx.page_size` stays the trim size, extend backgrounds by `ctx.bleed`), `page {width_mm,height_mm}`, `web {dpi: 150, quality: 80}`, `colors` (sRGB hex) + content keys. Quote every string, indent with spaces. Content is never hardcoded in `build.py`. `pip install -r requirements.txt` (reportlab, pillow, pikepdf, pyyaml).
+- `build.py` validates content (missing keys, missing image files, unknown blocks) and prints WARNINGS: column overflow, photo below target dpi. CLI: `python3 build.py` builds every target in `targets`; `--target print|web` is only a one-off partial run; `--bump` raises `version` (new `dist/v<N>/`); `--content file.yaml`. Every output is checked right after building and a failed check stops the build.
 - Photos fill leftover space: compute the free height and adapt the crop (`focus_x`, `focus_y` 0..1), never touch the rest of the layout.
 
-## 3. Targets and output names (`dist/<slug>-<color>-<dpi>dpi[-<variant>].pdf`)
+## 3. Targets and output names (`dist/v<N>/<slug>-v<N>-<color>-<dpi>dpi[-<variant>].pdf`)
 | target | file | purpose |
 |---|---|---|
 | print | `<slug>-cmyk-fogra39-300dpi.pdf` | pure, editable (CMYK) |
 | print | `<slug>-cmyk-fogra39-300dpi-pdfx1a.pdf` | PDF/X-1a, goes to the printer |
 | web | `<slug>-rgb-300dpi.pdf` | pure, editable (sRGB) |
 | web | `<slug>-rgb-150dpi-web.pdf` | optimized: images at `web.dpi`, JPEG `web.quality`, linearized |
-A full run cleans `dist/`; `--target` replaces only its own files. Hyphens only, lowercase, no accents in names. All four files build in seconds.
+Versioning: iterate on the same `version`; bump when a new version goes to the client. A full run cleans only `dist/v<N>/` (older versions stay); `--target` replaces only its own files. Hyphens only, lowercase, no accents in names. All four files build in seconds.
 
 ## 4. Technical rules
 - Text stays VECTOR with embedded fonts, one line = one text object (editable in Affinity/Illustrator/Acrobat). Ship the fonts. Find fonts in /usr/share/fonts, else raw.githubusercontent.com/google/fonts/main/ofl/<FONT>/. FOGRA39 profile: /usr/share/texlive/texmf-dist/tex/generic/colorprofiles/FOGRA39L_coated.icc (copy into assets/profiles).
@@ -49,10 +51,11 @@ A full run cleans `dist/`; `--target` replaces only its own files. Hyphens only,
 When the reportlab PDF is clean (DeviceCMYK/Gray only, fonts embedded, no transparency), reprocess nothing; only ADD: TrimBox/BleedBox per page (Trim = Media when bleed 0), ICC stream (`N=4`, `Alternate=DeviceCMYK`), `OutputIntents[0]` = {Type OutputIntent, S GTS_PDFX, OutputCondition and Info "Coated FOGRA39 (ISO 12647-2:2004)", OutputConditionIdentifier "FOGRA39", RegistryName http://www.color.org, DestOutputProfile}, docinfo `GTS_PDFXVersion` "PDF/X-1:2001", `GTS_PDFXConformance` "PDF/X-1a:2001", `Trapped` = `pikepdf.Name('/False')` (NOT `Name.False_`), Title, Author, then `pdf.save(min_version='1.3', force_version='1.3', object_stream_mode=disable, compress_streams=True, deterministic_id=True)`. Measured on a real menu: identical text with accents, 5/5 images byte-identical, 0 pixels different at 300 dpi, 0.2 s.
 - Reject the direct method if you find: `rg/RG` operators, non-DeviceCMYK/Gray images, SMask or ExtGState alpha, named ColorSpace. Then Ghostscript fallback (only for third-party PDFs; tell the user it rewrites fonts and recompresses JPEGs; keep the original as the editable one): `.ps` with GTS keys + OutputIntent + embedded ICC N=4, NOT named PDFX_def.ps; run with `-dNOSAFER -dCompatibilityLevel=1.3 -sColorConversionStrategy=CMYK -sProcessColorModel=DeviceCMYK -dDownsampleColorImages=false` (never `-dColorImageDownsampleType=/None`); then add TrimBox with pikepdf.
 - Final report to the user: version 1.3; GTS keys; Trapped False; OutputIntent FOGRA39 with N=4 profile; /ID; TrimBox on all pages; fonts embedded; only CMYK/Gray; zero rg/RG; no transparency; not encrypted. Compare with the pure PDF: `pdftotext` identical, `pdfimages -all` md5 equal, `pdftoppm -r 300` zero different pixels.
-- Honesty: this is a structural self-check, NOT a certification; recommend the printer's preflight (Acrobat Pro, callas pdfToolbox, PitStop). `bleed_mm` only sets Trim/BleedBox; a real bleed needs a larger page with extended background. X-4 / PDF/A were not tested.
+- Ghostscript on a PDF with transparency can flatten whole pages into images (no text, no fonts) while an old checklist still said "ok": the checklist must fail when no vector text exists (`lib/check.py` and the X-1a report do).
+- Honesty: this is a structural self-check, NOT a certification; recommend the printer's preflight (Acrobat Pro, callas pdfToolbox, PitStop). With `bleed_mm > 0` the page is larger and Trim/BleedBox are set; the layout must extend backgrounds into the bleed; crop marks are not drawn. X-4 / PDF/A were not tested.
 
 ## 6. Workflow
-1. Inventory attachments (`pdftoppm -r 100`, `pdfimages -j`, `pdffonts`). 2. Gather content BEFORE drawing; write `content.yaml`. 3. Write `draw()` for the reference layout. 4. Preview (`pdftoppm -r 90`) and check: cut text, overlaps, unbalanced columns, contrast (dark text on mid orange fails: lighten the background), orphan words. 5. Send the first draft early; iterate only on what the user points out. 6. Build all targets, run the checks of sections 4–5, send the PDFs from `dist/` and the kit zip (with `dist/` filled), and say in one line what was not possible (low-res photo, missing price).
+1. Inventory attachments (`pdftoppm -r 100`, `pdfimages -j`, `pdffonts`). 2. Gather content BEFORE drawing; write `content.yaml`. 3. Write `draw()` for the reference layout. 4. Preview (`pdftoppm -r 90`) and check: cut text, overlaps, unbalanced columns, contrast (dark text on mid orange fails: lighten the background), orphan words. 5. Send the first draft early; iterate only on what the user points out. 6. Build all targets, run the checks of sections 4–5 (`python3 lib/check.py`), run `python3 -m unittest` if `lib/` changed, send the PDFs from `dist/` and the kit zip (with `dist/` filled), and say in one line what was not possible (low-res photo, missing price).
 Never say "print-ready" without running the checks.
 
 ## 7. Content review (before final delivery; if asked, only report and wait for approval before editing)

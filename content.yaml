@@ -7,12 +7,13 @@
 # =====================================================================
 
 slug: "client-project-a4"          # base of every output file name: <client>-<project>-<size>
+version: 1                     # bump when you deliver a new version to the client (or: python3 build.py --bump)
 title: "Document title"        # PDF metadata
 author: ""                    # who made the file (your name or studio) -> PDF Author. Empty = the AI asks.
 client: "Client name"      # PDF Subject metadata
 lang: "en"                     # PDF language (pt-BR, en, ...)
 targets: [print, web]         # deliverables of this project (set once): print, web or both
-bleed_mm: 0                    # only sets Trim/BleedBox; make `page` larger for a real bleed
+bleed_mm: 0                    # real bleed: >0 makes the PDF page larger; draw() backgrounds extend by ctx.bleed
 page: {width_mm: 210, height_mm: 297}   # any size (A4 shown)
 web: {dpi: 150, quality: 80}   # optimized web version: image dpi / JPEG quality
 
@@ -28,7 +29,7 @@ header: "Studio name"
 heading: "A clear heading"
 intro: "Replace this text with the real content. Everything on the page comes from this file, so edits never touch the layout code."
 items:
-  - ["First item", "10,00"]
-  - ["Second item", "25,00"]
+  - ["Pão de queijo", "10,00"]
+  - ["Açaí com granola", "25,00"]
   - ["Third item with a longer name that wraps when needed", "40,00"]
 photo: {file: "assets/images/placeholder.jpg", focus_y: 0.5}

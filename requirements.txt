@@ -1,4 +1,4 @@
-reportlab
-pillow
-pikepdf
-pyyaml
+reportlab>=4.0
+pillow>=10.0
+pikepdf>=8.0
+pyyaml>=6.0
