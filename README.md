@@ -23,9 +23,15 @@ pip install -r requirements.txt
 python3 build.py                 # every target in `targets` of content.yaml
 python3 build.py --target web    # one run, only that target (print | web)
 python3 build.py --bump          # version += 1 (new dist/v<N>/ folder), then build
+python3 prep.py                  # prepare images (assets/originals -> assets/images)
 python3 lib/check.py dist/v1/*.pdf   # re-check any generated PDF
 python3 -m unittest              # test suite (~25 s)
 ```
+
+## Image prep
+Put original photos and logos in `assets/originals/` (never modified). Describe what each one needs in `prep.yaml` (crop to a ratio, resize, tone, denoise, flatten transparency) and run `python3 prep.py`: the result lands in `assets/images/`, which is what the layout uses. Embedded color profiles are converted to sRGB and EXIF rotation is applied automatically.
+`python3 prep.py --report` lists every image with its size, profile and the largest size it can print at 300 dpi.
+Background removal, real upscaling and image generation are done by the AI agent with its own tools; the raw result is saved in `assets/originals/` and logged in `assets/originals/SOURCES.md`.
 
 ## Outputs
 Files go to `dist/v<version>/`, named `<slug>-v<version>-<color>-<dpi>dpi[-<variant>].pdf`.
@@ -50,7 +56,7 @@ Every output is checked right after the build (fonts embedded, vector text prese
 1. Copy this folder and name it `kit-<client>-<project>-<size>` (e.g. `kit-acme-menu-a4`).
 2. Set `slug` (same name without `kit-`), `title`, `author`, `client`, `lang`, `targets`, `page` (any size), `colors` in `content.yaml`.
 3. Replace `draw()` in `build.py` with the real layout (keep `run(...)` at the bottom) and the example keys in `content.yaml` with the real content.
-4. Put fonts in `assets/fonts/` (register them in `build.py`) and images in `assets/images/`.
+4. Put fonts in `assets/fonts/` (register them in `build.py`) and original images in `assets/originals/`, then prepare them with `prep.yaml` + `python3 prep.py`.
 5. Build, run the tests when you touch `lib/`, and check `dist/`.
 
 `lib/` is the shared pipeline — do not fork it per project. `assets/images/placeholder.jpg` is a dummy; delete it.

@@ -9,8 +9,15 @@ pdf-layout-starter. Content and layout are separate. Code, keys, folders: Englis
 - Never edit `dist/` (generated). After any layout change run `python3 build.py` (all targets); `--target` is only for one partial run.
 - Delivering a new version to the client → `python3 build.py --bump` (writes `dist/v<N>/`; older versions stay). Same version while iterating.
 - Touching `lib/` → run `python3 -m unittest` (must stay green).
+- Image changes → edit `prep.yaml`, run `python3 prep.py`, then build.
 - After the build, send the PDFs from `dist/` to the user for preview.
 - Naming: folder `kit-<client>-<project>-<size>`, `slug` = same without `kit-`.
+
+## Image prep (`prep.py`, `prep.yaml`, `lib/prep.py`)
+- Originals go in `assets/originals/` and are never modified. Recipes in `prep.yaml` turn them into `assets/images/` (what the layout uses): `python3 prep.py` (`--only NAME`, `--report` lists size, profile and max print size at 300 dpi).
+- Local ops: `crop` (ratio + focus or box), `resize` (never upscales unless `upscale: true`), `tone`, `denoise`, `sharpen`, `flatten`. `normalize` always runs first (EXIF orientation, embedded ICC → sRGB, CMYK → RGB).
+- AI ops (background removal, real upscaling, generation, mockups) are done by the agent with whatever image tools it has (connectors, its own image abilities). Save the raw result in `assets/originals/` with a suffix (`dish--nobg.png`, `dish--up4x.jpg`), log tool, date and parameters in `assets/originals/SOURCES.md`, then reference it in `prep.yaml`. Check usage rights of generated or third-party images.
+- Before layout work run `python3 prep.py --report`: a photo below 300 dpi at its printed size needs a larger original or a real upscale, not a bigger `resize`.
 
 ## What `lib/core.py` does for you
 - targets: `print` → `cmyk-fogra39-300dpi.pdf` + `-pdfx1a.pdf`; `web` → `rgb-300dpi.pdf` + `rgb-<dpi>dpi-web.pdf`. Files: `dist/v<version>/<slug>-v<version>-<suffix>.pdf`.

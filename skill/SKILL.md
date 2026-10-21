@@ -21,7 +21,9 @@ kit-<client>-<project>-<size>/        e.g. kit-recanto-do-tambaqui-cardapio-a4
   lib/core.py             pipeline: targets, versions, bleed, color, images, naming, web optimize
   lib/check.py            checks any PDF (fonts, vector text, Unicode map, CMYK-only, dpi)
   lib/export_x1a.py       CMYK PDF -> PDF/X-1a:2001
-  assets/{images,fonts,profiles}/   (profiles/FOGRA39L_coated.icc)
+  prep.py + lib/prep.py   image prep: assets/originals/ --prep.yaml--> assets/images/
+  prep.yaml               per-image recipes (crop, resize, tone, denoise, sharpen, flatten)
+  assets/{originals,images,fonts,profiles}/   (originals = untouched sources, images = prepared, profiles/FOGRA39L_coated.icc)
   dist/v<N>/              generated PDFs (committing them is the user's choice)
 ```
 - `README.md` is for humans (install, build, edit, ~15 lines). `AGENTS.md` is for AIs (rules, block types, hard rules, what not to touch, "after the build send the PDFs from dist/ to the user for preview").
@@ -46,6 +48,11 @@ Versioning: iterate on the same `version`; bump when a new version goes to the c
 - Images, pure outputs (300 dpi at printed size): NEVER downsample; upscale with LANCZOS only if below 300 dpi (warn with the real dpi); UnsharpMask(radius 1.4, percent 55, threshold 2); JPEG quality 100, subsampling 0, dpi tag. Crop the visible area first, then convert.
 - Images, web optimized: build directly at the target dpi (downsample LANCZOS, no upscale), JPEG ~80, then pikepdf `save(linearize=True, compress_streams=True, object_stream_mode=generate)`, set Title/Author/`/Lang`. Never post-compress with Ghostscript (loses accents' Unicode map, recompresses). Expect ~1–2 MB vs ~12 MB for a full A4 photo menu.
 
+## 4b. Image prep (before layout)
+- Originals live in `assets/originals/` and are never modified; `prep.yaml` recipes produce `assets/images/` (the only folder the layout reads). `python3 prep.py` runs them (`--only NAME`; `--report` lists px, MP, profile and max print size at 300 dpi). Run `--report` first: a photo too small for its printed size needs a larger original or a real upscale, not a bigger `resize`.
+- Local ops, applied in order after an implicit `normalize` (EXIF orientation, embedded ICC -> sRGB, CMYK -> RGB): `crop {ratio, focus_x, focus_y | box}`, `resize {max | width, upscale}` (never upscales by default), `tone {brightness, contrast, saturation, gamma, warmth, auto}`, `denoise {size}`, `sharpen {radius, percent, threshold}` (the build sharpens again: use sparingly), `flatten {color}`. Output `.jpg` (q100, 4:4:4) or `.png` (alpha kept).
+- AI steps (background removal, real upscaling, generation, mockups) use whatever image tools the agent has (connectors or its own abilities). Save the raw result in `assets/originals/` with a suffix (`dish--nobg.png`), log tool, date and parameters in `assets/originals/SOURCES.md`, then reference it in `prep.yaml`. Check usage rights of generated/third-party images.
+
 ## 5. PDF/X-1a:2001 — direct pikepdf method (tested)
 When the reportlab PDF is clean (DeviceCMYK/Gray only, fonts embedded, no transparency), reprocess nothing; only ADD: TrimBox/BleedBox per page (Trim = Media when bleed 0), ICC stream (`N=4`, `Alternate=DeviceCMYK`), `OutputIntents[0]` = {Type OutputIntent, S GTS_PDFX, OutputCondition and Info "Coated FOGRA39 (ISO 12647-2:2004)", OutputConditionIdentifier "FOGRA39", RegistryName http://www.color.org, DestOutputProfile}, docinfo `GTS_PDFXVersion` "PDF/X-1:2001", `GTS_PDFXConformance` "PDF/X-1a:2001", `Trapped` = `pikepdf.Name('/False')` (NOT `Name.False_`), Title, Author, then `pdf.save(min_version='1.3', force_version='1.3', object_stream_mode=disable, compress_streams=True, deterministic_id=True)`. Measured on a real menu: identical text with accents, 5/5 images byte-identical, 0 pixels different at 300 dpi, 0.2 s.
 - Reject the direct method if you find: `rg/RG` operators, non-DeviceCMYK/Gray images, SMask or ExtGState alpha, named ColorSpace. Then Ghostscript fallback (only for third-party PDFs; tell the user it rewrites fonts and recompresses JPEGs; keep the original as the editable one): `.ps` with GTS keys + OutputIntent + embedded ICC N=4, NOT named PDFX_def.ps; run with `-dNOSAFER -dCompatibilityLevel=1.3 -sColorConversionStrategy=CMYK -sProcessColorModel=DeviceCMYK -dDownsampleColorImages=false` (never `-dColorImageDownsampleType=/None`); then add TrimBox with pikepdf.
@@ -54,7 +61,7 @@ When the reportlab PDF is clean (DeviceCMYK/Gray only, fonts embedded, no transp
 - Honesty: this is a structural self-check, NOT a certification; recommend the printer's preflight (Acrobat Pro, callas pdfToolbox, PitStop). With `bleed_mm > 0` the page is larger and Trim/BleedBox are set; the layout must extend backgrounds into the bleed; crop marks are not drawn. X-4 / PDF/A were not tested.
 
 ## 6. Workflow
-1. Inventory attachments (`pdftoppm -r 100`, `pdfimages -j`, `pdffonts`). 2. Gather content BEFORE drawing; write `content.yaml`. 3. Write `draw()` for the reference layout. 4. Preview (`pdftoppm -r 90`) and check: cut text, overlaps, unbalanced columns, contrast (dark text on mid orange fails: lighten the background), orphan words. 5. Send the first draft early; iterate only on what the user points out. 6. Build all targets, run the checks of sections 4–5 (`python3 lib/check.py`), send the PDFs from `dist/` and the kit zip (with `dist/` filled), and say in one line what was not possible (low-res photo, missing price).
+1. Inventory attachments (`pdftoppm -r 100`, `pdfimages -j`, `pdffonts`). 2. Gather content BEFORE drawing; write `content.yaml`; prepare images (`prep.py --report`, then recipes). 3. Write `draw()` for the reference layout. 4. Preview (`pdftoppm -r 90`) and check: cut text, overlaps, unbalanced columns, contrast (dark text on mid orange fails: lighten the background), orphan words. 5. Send the first draft early; iterate only on what the user points out. 6. Build all targets, run the checks of sections 4–5 (`python3 lib/check.py`), send the PDFs from `dist/` and the kit zip (with `dist/` filled), and say in one line what was not possible (low-res photo, missing price).
 Never say "print-ready" without running the checks.
 
 ## 7. Content review (before final delivery; if asked, only report and wait for approval before editing)

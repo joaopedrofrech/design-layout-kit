@@ -1,0 +1,19 @@
+# Image prep recipes: assets/originals/<src>  ->  assets/images/<out>
+# Run:  python3 prep.py        (python3 prep.py --report  lists sizes, profiles and max print size)
+# Originals are never modified. The layout reads only assets/images/.
+#
+# Each entry:  src (file in assets/originals/) · out (optional, defaults to src) · ops (applied in order)
+# Always applied first (normalize): EXIF orientation, embedded ICC -> sRGB, CMYK -> RGB.
+#
+# ops:
+#   - crop: {ratio: "4:3", focus_x: 0.5, focus_y: 0.5}      # or {box: [left, top, right, bottom]} in px
+#   - resize: {max: 3000}                                     # longest side; never upscales unless upscale: true
+#   - tone: {brightness: 1, contrast: 1, saturation: 1, gamma: 1, warmth: 0, auto: false}   # warmth -1..1
+#   - denoise: {size: 3}
+#   - sharpen: {radius: 1.4, percent: 55, threshold: 2}      # the build sharpens photos again: use sparingly
+#   - flatten: {color: "#ffffff"}                             # transparent PNG -> solid color
+#
+# AI steps (background removal, real upscaling, generation) are done by the agent with its own tools:
+# save the raw result in assets/originals/ (e.g. dish--nobg.png) and log it in assets/originals/SOURCES.md.
+
+images: []
