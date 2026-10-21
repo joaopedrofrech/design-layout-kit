@@ -1,6 +1,6 @@
 # AGENTS.md
 
-pdf-layout-starter. Content and layout are separate. Code, keys, folders: English. Content values: the client's language.
+design-layout-kit-starter. Content and layout are separate. Code, keys, folders: English. Content values: the client's language.
 
 ## Rules
 - Content change → edit only the design's `content.yaml` (or `brand.yaml` for shared keys), then `python3 designs/<design>/build.py`.

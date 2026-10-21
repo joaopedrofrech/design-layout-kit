@@ -1,6 +1,6 @@
-# pdf-layout-starter
+# design-layout-kit-starter
 
-A project template for PDFs where layout matters (menus, flyers, price lists, catalogs, one-pagers) and the content changes over time.
+Starter for **design-layout-kit**: a project template for designs (PDF, PNG, JPG) where layout matters (menus, flyers, price lists, catalogs, one-pagers) and the content changes over time.
 
 **What it is:** a small Python pipeline that builds the PDF from two separate things:
 - `content.yaml` (one per design) — all text, prices, photo names and the design's settings (size, bleed, targets, version).
@@ -98,5 +98,5 @@ Every output is checked right after the build (fonts embedded, vector text prese
 The X-1a check is structural, not a certification: ask the printer to run preflight.
 
 ## Files in this repo
-- `skill/SKILL.md` — reference copy of the `pdf-layout-kit` AI skill (the skill itself does not depend on this repo).
+- `skill/SKILL.md` — reference copy of the `design-layout-kit` AI skill (the skill itself does not depend on this repo).
 - `NOTICE` — third-party licenses (Poppins font, FOGRA39 profile). Code: MIT (`LICENSE`).

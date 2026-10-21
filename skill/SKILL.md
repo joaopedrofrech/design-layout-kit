@@ -1,9 +1,9 @@
 ---
-name: "pdf-layout-kit"
-description: "Cria kits de PDF com layout controlado: conteúdo em YAML separado do layout, saídas para impressão (CMYK/FOGRA39, 300 dpi, PDF/X-1a) e web (sRGB, otimizado), sempre editáveis. Tamanho e layout livres."
+name: "design-layout-kit"
+description: "Cria kits de design com layout controlado: conteúdo em YAML separado do layout, saídas para impressão (CMYK/FOGRA39, 300 dpi, PDF/X-1a), web (sRGB, otimizado) e imagem (PNG/JPG), sempre editáveis. Tamanho e layout livres."
 ---
 
-# PDF layout kit (editable print + web)
+# Design layout kit (editable print, web and image)
 
 Layout is NEVER fixed: each project has its own size, pages and layout, taken from the user's references. What repeats is the method and the technical rules below. Answer in the user's language (Portuguese if he writes Portuguese). Code, keys, folders and file names are always English; only content values use the content's language.
 
