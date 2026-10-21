@@ -1,8 +1,10 @@
 """
 Image prep: assets/originals/  --(prep.yaml recipes)-->  assets/images/
 
-Originals are never modified. Each recipe in prep.yaml lists a source file and a list of
-operations; the result is written to assets/images/ and is what the layout uses.
+Optional and minimal: nothing is edited unless a recipe asks for it. Originals are never modified.
+Each recipe in prep.yaml names a source file and, only if needed, a list of operations; the result is
+written to assets/images/ and is what the layout uses. A recipe without `ops` just normalizes the file
+(orientation + sRGB). A file that needs nothing can simply be placed in assets/images/ directly.
 
     python3 prep.py                 # run every recipe
     python3 prep.py --only dish.jpg # run only recipes whose output name matches
@@ -17,7 +19,7 @@ Operations (applied in order, after the implicit `normalize`):
     flatten: {color: "#ffffff"}                                 (alpha -> solid color)
 
 `normalize` (always first): EXIF orientation, embedded ICC profile -> sRGB, CMYK -> RGB.
-Output: .jpg (quality 100, 4:4:4) or .png (keeps alpha unless `flatten` is used).
+Output: .jpg (quality 100, 4:4:4; alpha is flattened on white) or .png (keeps alpha).
 AI steps (background removal, real upscaling, generation) run outside this script: see AGENTS.md.
 """
 import argparse
@@ -169,7 +171,9 @@ def run_recipe(r, originals, images):
     if out.lower().endswith(".png"):
         im.save(out, "PNG", optimize=True)
     else:
-        im.convert("RGB").save(out, "JPEG", quality=100, subsampling=0)
+        if im.mode == "RGBA":                       # JPEG has no alpha: flatten on white instead of dropping it
+            im = op_flatten(im, {})
+        im.save(out, "JPEG", quality=100, subsampling=0)
     return out, im.size
 
 

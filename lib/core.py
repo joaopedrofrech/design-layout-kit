@@ -12,7 +12,7 @@ ctx (passed to draw):
     ctx.out          current output: mode (cmyk|rgb), dpi, quality, up, down, optimize, suffix, x1a
     ctx.K            colors by name from content "colors" (reportlab colors, already in the output space)
     ctx.white        white in the output space
-    ctx.P(*parts)    path relative to the project folder
+    ctx.P(*parts)    path relative to the art folder, falling back to the kit root (shared assets)
     ctx.make_image(PIL image, w_pt, h_pt, photo=True) -> temp JPEG path ready for drawImage
     ctx.warn(msg)    collected and printed after each output
     ctx.page_size    (width, height) of the TRIM size in points (draw as if there were no bleed)
@@ -36,16 +36,53 @@ from reportlab.pdfgen import canvas
 MM = 72 / 25.4
 
 
-def load_content(path):
+def kit_root(here):
+    """Folder that holds lib/core.py: `here` itself, or the nearest parent (an art in arts/<name>/)."""
+    p = os.path.abspath(here)
+    while not os.path.exists(os.path.join(p, "lib", "core.py")):
+        if p == os.path.dirname(p):
+            sys.exit("lib/core.py not found in any parent folder.")
+        p = os.path.dirname(p)
+    return p
+
+
+def resolver(here, kit):
+    """P(*parts): path inside the art folder if it exists there, else inside the kit root (shared assets)."""
+    def P(*parts):
+        own = os.path.join(here, *parts)
+        if os.path.exists(own):
+            return own
+        shared = os.path.join(kit, *parts)
+        return shared if os.path.exists(shared) else own
+    return P
+
+
+def load_content(path, kit=None):
+    """Reads the YAML. If brand.yaml exists in the kit root it is merged underneath (the art's keys win;
+    `colors` and `web` are merged key by key)."""
     try:
         import yaml
     except ImportError:
         sys.exit("Missing PyYAML:  pip install -r requirements.txt")
-    with open(path, encoding="utf-8") as f:
-        try:
-            return yaml.safe_load(f)
-        except yaml.YAMLError as e:
-            sys.exit(f"Invalid YAML (check indentation with spaces, quotes, colons):\n{e}")
+
+    def read(p):
+        with open(p, encoding="utf-8") as f:
+            try:
+                return yaml.safe_load(f) or {}
+            except yaml.YAMLError as e:
+                sys.exit(f"Invalid YAML in {p} (check indentation with spaces, quotes, colons):\n{e}")
+
+    D = read(path)
+    brand = os.path.join(kit, "brand.yaml") if kit else None
+    if brand and os.path.exists(brand) and os.path.abspath(path) != os.path.abspath(brand):
+        merged = read(brand)
+        for k, v in D.items():
+            if k in ("colors", "web") and isinstance(v, dict) and isinstance(merged.get(k), dict):
+                merged[k] = {**merged[k], **v}
+            else:
+                merged[k] = v
+        return merged
+    return D
 
 
 def base_errors(D):
@@ -68,8 +105,10 @@ def outputs(target, web):
 
 
 class Ctx:
-    def __init__(self, D, base):
+    def __init__(self, D, base, kit=None):
+        self.kit = kit or base
         self.D, self.base = D, base
+        self.P = resolver(base, self.kit)
         self.out = None
         self.K = SimpleNamespace()
         self.white = None
@@ -83,16 +122,13 @@ class Ctx:
         self.bleed = float(D.get("bleed_mm", 0)) * MM
         self.full_size = (self.page_size[0] + 2 * self.bleed, self.page_size[1] + 2 * self.bleed)
         self.version = int(D.get("version", 1))
-        icc = os.path.join(base, "assets", "profiles", "FOGRA39L_coated.icc")
+        icc = os.path.join(self.kit, "assets", "profiles", "FOGRA39L_coated.icc")
         srgb = ImageCms.createProfile("sRGB")
         fogra = ImageCms.getOpenProfile(icc)
         self._flat = ImageCms.buildTransform(srgb, fogra, "RGB", "CMYK",
                                              renderingIntent=ImageCms.Intent.RELATIVE_COLORIMETRIC)
         self._photo = ImageCms.buildTransform(srgb, fogra, "RGB", "CMYK",
                                               renderingIntent=ImageCms.Intent.PERCEPTUAL)
-
-    def P(self, *a):
-        return os.path.join(self.base, *a)
 
     def warn(self, msg):
         self.warnings.append(msg)
@@ -185,26 +221,28 @@ def run(draw, base_dir, font, validate=None):
     ap = argparse.ArgumentParser(description="Build PDFs into dist/")
     ap.add_argument("--target", choices=["print", "web"],
                     help="build only this target (default: every target in 'targets' of the content file)")
-    ap.add_argument("--content", default=os.path.join(base_dir, "content.yaml"))
+    ap.add_argument("--content", default=os.path.join(base_dir, "content.yaml"),
+                    help="content file (default content.yaml); another file = a variation with the same layout")
     ap.add_argument("--bump", action="store_true",
                     help="increase `version` in the content file first (new dist/v<N>/ folder)")
     args = ap.parse_args()
+    kit = kit_root(base_dir)
 
     if args.bump:
         print(f"Version bumped to v{bump_version(args.content)}")
-    D = load_content(args.content)
+    D = load_content(args.content, kit)
     errors = base_errors(D) + (validate(D) if validate else [])
     if errors:
         sys.exit("content.yaml has problems:\n  - " + "\n  - ".join(errors))
     targets = [args.target] if args.target else list(D.get("targets", ["print", "web"]))
 
-    ctx = Ctx(D, base_dir)
+    ctx = Ctx(D, base_dir, kit)
     if not D.get("author"):
         print("  • 'author' is empty in content.yaml (PDF metadata): ask who signs the file.")
     dist = os.path.join(base_dir, "dist", f"v{ctx.version}")
     os.makedirs(dist, exist_ok=True)
-    if not args.target:                       # full run: only dist/v<version>/ is cleaned
-        for old in glob.glob(os.path.join(dist, "*.pdf")):
+    if not args.target:                       # full run: only this slug's files of this version are cleaned
+        for old in glob.glob(os.path.join(dist, f"{glob.escape(D['slug'])}-v{ctx.version}-*.pdf")):
             os.remove(old)
 
     made = []
@@ -229,7 +267,7 @@ def run(draw, base_dir, font, validate=None):
         print(f"OK  {os.path.basename(path)}")
         for w in ctx.warnings:
             print("  •", w)
-        sys.path.insert(0, base_dir)
+        sys.path.insert(0, kit)
         from lib.check import check, failed
         results = check(path, out.mode, min_dpi=299 if out.up else None,
                         max_dpi=out.dpi + 1 if out.down else None)
@@ -239,7 +277,7 @@ def run(draw, base_dir, font, validate=None):
         if failed(results):
             sys.exit("Output check failed — see above.")
         if out.x1a and D.get("x1a", True):
-            sys.path.insert(0, base_dir)
+            sys.path.insert(0, kit)
             from lib.export_x1a import export
             x1a = path[:-4] + "-pdfx1a.pdf"
             ok = export(path, x1a, D["title"], D.get("author", ""), D.get("bleed_mm", 0))

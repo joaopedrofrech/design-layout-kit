@@ -13,7 +13,13 @@ pdf-layout-starter. Content and layout are separate. Code, keys, folders: Englis
 - After the build, send the PDFs from `dist/` to the user for preview.
 - Naming: folder `kit-<client>-<project>-<size>`, `slug` = same without `kit-`.
 
+## More than one art
+- Default is one art at the root. Variation with the same layout → another content file + `python3 build.py --content <file>` (own `slug`). Different layout → `python3 new_art.py <name> --slug <client>-<project>-<size>` → `arts/<name>/{build.py,content.yaml}`, built with `python3 arts/<name>/build.py`; its `dist/` and `version` are its own.
+- `lib/`, fonts, images and the ICC profile are shared from the kit root (`P(...)` looks in the art folder first, then the root). Never copy `lib/` into an art.
+- Optional `brand.yaml` at the kit root holds shared keys (`author`, `client`, `lang`, `colors`, `web`); the art's `content.yaml` overrides it. When asked for a new art of the same client, reuse its brand, fonts and images before asking for them again.
+
 ## Image prep (`prep.py`, `prep.yaml`, `lib/prep.py`)
+- Optional and minimal: edit an image only when it has a visible problem or the layout needs a crop. No default denoise, sharpening or tone. An image that needs nothing goes straight into `assets/images/`.
 - Originals go in `assets/originals/` and are never modified. Recipes in `prep.yaml` turn them into `assets/images/` (what the layout uses): `python3 prep.py` (`--only NAME`, `--report` lists size, profile and max print size at 300 dpi).
 - Local ops: `crop` (ratio + focus or box), `resize` (never upscales unless `upscale: true`), `tone`, `denoise`, `sharpen`, `flatten`. `normalize` always runs first (EXIF orientation, embedded ICC → sRGB, CMYK → RGB).
 - AI ops (background removal, real upscaling, generation, mockups) are done by the agent with whatever image tools it has (connectors, its own image abilities). Save the raw result in `assets/originals/` with a suffix (`dish--nobg.png`, `dish--up4x.jpg`), log tool, date and parameters in `assets/originals/SOURCES.md`, then reference it in `prep.yaml`. Check usage rights of generated or third-party images.

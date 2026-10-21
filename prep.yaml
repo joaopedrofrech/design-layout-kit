@@ -1,11 +1,13 @@
-# Image prep recipes: assets/originals/<src>  ->  assets/images/<out>
+# Image prep (optional): assets/originals/<src>  ->  assets/images/<out>
+# Add a recipe ONLY for an image that needs it. Nothing is applied by default: no denoise, no sharpening, no tone.
+# An image that needs nothing can go straight into assets/images/ (or get a recipe with no ops: orientation + sRGB only).
 # Run:  python3 prep.py        (python3 prep.py --report  lists sizes, profiles and max print size)
 # Originals are never modified. The layout reads only assets/images/.
 #
-# Each entry:  src (file in assets/originals/) · out (optional, defaults to src) · ops (applied in order)
+# Each entry:  src (file in assets/originals/) · out (optional, defaults to src) · ops (optional, applied in order)
 # Always applied first (normalize): EXIF orientation, embedded ICC -> sRGB, CMYK -> RGB.
 #
-# ops:
+# ops (pick only what the image really needs):
 #   - crop: {ratio: "4:3", focus_x: 0.5, focus_y: 0.5}      # or {box: [left, top, right, bottom]} in px
 #   - resize: {max: 3000}                                     # longest side; never upscales unless upscale: true
 #   - tone: {brightness: 1, contrast: 1, saturation: 1, gamma: 1, warmth: 0, auto: false}   # warmth -1..1

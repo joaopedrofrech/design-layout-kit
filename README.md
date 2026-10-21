@@ -28,8 +28,15 @@ python3 lib/check.py dist/v1/*.pdf   # re-check any generated PDF
 python3 -m unittest              # test suite (~25 s)
 ```
 
+## More than one art
+Most kits hold one art, and that is the default: `build.py` + `content.yaml` at the root. When a client needs more, the same kit grows without changing anything:
+- **Same layout, different content or size** (a variation): copy `content.yaml` to e.g. `content-flyer.yaml` and run `python3 build.py --content content-flyer.yaml`. Give it its own `slug`.
+- **A different layout** (flyer next to the menu, banner next to the folder): `python3 new_art.py flyer-a5 --slug acme-flyer-a5` creates `arts/flyer-a5/` with its own `build.py`, `content.yaml`, `version` and `dist/`. Run it with `python3 arts/flyer-a5/build.py`.
+- `lib/`, `assets/` (fonts, images, profile) stay shared at the kit root; an art can add its own `assets/` and its files win.
+- Optional `brand.yaml` at the root (`author`, `client`, `lang`, `colors`, `web`…) is merged under every art, so brand colors live in one place; the art's own keys win.
+
 ## Image prep
-Put original photos and logos in `assets/originals/` (never modified). Describe what each one needs in `prep.yaml` (crop to a ratio, resize, tone, denoise, flatten transparency) and run `python3 prep.py`: the result lands in `assets/images/`, which is what the layout uses. Embedded color profiles are converted to sRGB and EXIF rotation is applied automatically.
+Optional and minimal: nothing is edited unless you ask. Put original photos and logos in `assets/originals/` (never modified). Only for an image that needs something, add a recipe in `prep.yaml` (crop to a ratio, resize, tone, denoise, flatten transparency) and run `python3 prep.py`: the result lands in `assets/images/`, which is what the layout uses. An image that needs nothing can go straight into `assets/images/`. Recipe images get their embedded color profile converted to sRGB and EXIF rotation applied.
 `python3 prep.py --report` lists every image with its size, profile and the largest size it can print at 300 dpi.
 Background removal, real upscaling and image generation are done by the AI agent with its own tools; the raw result is saved in `assets/originals/` and logged in `assets/originals/SOURCES.md`.
 
@@ -53,7 +60,7 @@ Every output is checked right after the build (fonts embedded, vector text prese
 `bleed_mm: 3` makes the PDF page larger (trim + 3 mm each side) with the origin at the trim corner. `draw()` keeps using `ctx.page_size` (trim size); extend full-page backgrounds by `ctx.bleed`. X-1a gets `TrimBox`/`BleedBox` accordingly. Crop marks are not drawn (printers add them).
 
 ## Start a new project
-1. Copy this folder and name it `kit-<client>-<project>-<size>` (e.g. `kit-acme-menu-a4`).
+1. Copy this folder and name it `kit-<client>-<project>-<size>` (e.g. `kit-acme-menu-a4`); for a kit with several arts drop the size: `kit-<client>-<project>`.
 2. Set `slug` (same name without `kit-`), `title`, `author`, `client`, `lang`, `targets`, `page` (any size), `colors` in `content.yaml`.
 3. Replace `draw()` in `build.py` with the real layout (keep `run(...)` at the bottom) and the example keys in `content.yaml` with the real content.
 4. Put fonts in `assets/fonts/` (register them in `build.py`) and original images in `assets/originals/`, then prepare them with `prep.yaml` + `python3 prep.py`.

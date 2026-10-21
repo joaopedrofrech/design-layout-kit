@@ -184,6 +184,60 @@ class Bleed(unittest.TestCase):
                     self.assertAlmostEqual(tb[3] - tb[1], 297 * MM, delta=0.5)
 
 
+class MultiArt(unittest.TestCase):
+    def setUp(self):
+        self.proj = copy_project()
+        for f in ("new_art.py", "prep.py", "prep.yaml"):
+            src = os.path.join(ROOT, f)
+            if os.path.exists(src):
+                shutil.copy(src, self.proj)
+
+    def test_new_art_builds_in_its_own_folder_with_shared_assets(self):
+        r = subprocess.run([sys.executable, "new_art.py", "flyer", "--slug", "acme-flyer-a5"],
+                           cwd=self.proj, capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        r = subprocess.run([sys.executable, "arts/flyer/build.py", "--target", "web"],
+                           cwd=self.proj, capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        got = sorted(os.listdir(os.path.join(self.proj, "arts", "flyer", "dist", "v1")))
+        self.assertEqual(got, ["acme-flyer-a5-v1-rgb-150dpi-web.pdf", "acme-flyer-a5-v1-rgb-300dpi.pdf"])
+        self.assertFalse(os.path.exists(os.path.join(self.proj, "dist")))      # root untouched
+
+    def test_new_art_refuses_existing_and_bad_names(self):
+        ok = subprocess.run([sys.executable, "new_art.py", "a"], cwd=self.proj, capture_output=True, text=True)
+        self.assertEqual(ok.returncode, 0)
+        for name in ("a", "Bad Name"):
+            r = subprocess.run([sys.executable, "new_art.py", name], cwd=self.proj, capture_output=True, text=True)
+            self.assertNotEqual(r.returncode, 0)
+
+    def test_second_content_file_does_not_delete_the_first(self):
+        self.assertEqual(build(self.proj).returncode, 0)
+        before = {os.path.basename(f) for f in pdfs(self.proj)}
+        edit(self.proj, r'^slug:.*$', 'slug: "variation-a4"')
+        os.rename(os.path.join(self.proj, "content.yaml"), os.path.join(self.proj, "content-b.yaml"))
+        shutil.copy(os.path.join(ROOT, "content.yaml"), os.path.join(self.proj, "content.yaml"))
+        r = build(self.proj, "--content", "content-b.yaml")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        after = {os.path.basename(f) for f in pdfs(self.proj)}
+        self.assertTrue(before <= after)
+        self.assertEqual(len(after), 8)
+
+    def test_brand_yaml_fills_missing_keys_and_art_wins(self):
+        edit(self.proj, r'^author:.*$', "")
+        edit(self.proj, r'^client:.*$', "")
+        with open(os.path.join(self.proj, "brand.yaml"), "w", encoding="utf-8") as f:
+            f.write('author: "Brand Author"\nclient: "Brand Client"\n')
+        self.assertEqual(build(self.proj, "--target", "web").returncode, 0)
+        for f in pdfs(self.proj):
+            with pikepdf.open(f) as p:
+                self.assertEqual(str(p.docinfo["/Author"]), "Brand Author")
+                self.assertEqual(str(p.docinfo["/Subject"]), "Brand Client")
+        edit(self.proj, r'^title:', 'author: "Art Author"\ntitle:')
+        self.assertEqual(build(self.proj, "--target", "web").returncode, 0)
+        with pikepdf.open(pdfs(self.proj)[0]) as p:
+            self.assertEqual(str(p.docinfo["/Author"]), "Art Author")
+
+
 class Validation(unittest.TestCase):
     def test_missing_image_is_reported(self):
         proj = copy_project()

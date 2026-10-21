@@ -19,20 +19,25 @@ from reportlab.lib.utils import simpleSplit
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
-BASE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, BASE)
-from lib.core import run  # noqa: E402
+HERE = os.path.dirname(os.path.abspath(__file__))
+KIT = HERE                                     # kit root = nearest folder with lib/core.py (this one, or a parent when
+while not os.path.exists(os.path.join(KIT, "lib", "core.py")) and KIT != os.path.dirname(KIT):   # this is an art in arts/<name>/)
+    KIT = os.path.dirname(KIT)
+sys.path.insert(0, KIT)
+from lib.core import resolver, run  # noqa: E402
+
+P = resolver(HERE, KIT)                        # art folder first, then shared kit assets
 
 # ---- fonts: register every font used (and set the default in run(font=...))
 for name, file in [("Body", "Poppins-Regular.ttf"), ("BodyMd", "Poppins-Medium.ttf"),
                    ("BodyBd", "Poppins-Bold.ttf")]:
-    pdfmetrics.registerFont(TTFont(name, os.path.join(BASE, "assets", "fonts", file)))
+    pdfmetrics.registerFont(TTFont(name, P("assets", "fonts", file)))
 
 
 def validate(D):
     """Project-specific content checks; return a list of error strings."""
     err = [f"colors.{k} missing" for k in ("primary", "accent", "text", "muted") if k not in D.get("colors", {})]
-    if "photo" in D and not os.path.exists(os.path.join(BASE, D["photo"]["file"])):
+    if "photo" in D and not os.path.exists(P(D["photo"]["file"])):
         err.append(f"photo not found: {D['photo']['file']}")
     return err
 
@@ -96,4 +101,4 @@ def draw(c, ctx):
 
 
 if __name__ == "__main__":
-    run(draw, BASE, font="Body", validate=validate)
+    run(draw, HERE, font="Body", validate=validate)
