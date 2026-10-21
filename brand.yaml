@@ -1,0 +1,16 @@
+# =====================================================================
+#  BRAND — shared by every art in arts/ (YAML)
+# =====================================================================
+#  An art's own content.yaml can override any key. Indent with spaces, quote strings.
+
+author: ""                     # who made the file (your name or studio) -> PDF Author. Empty = the AI asks.
+client: "Client name"          # PDF Subject metadata
+lang: "en"                     # PDF language (pt-BR, en, ...)
+web: {dpi: 150, quality: 80}   # optimized web version: image dpi / JPEG quality
+
+# sRGB hex. print -> converted to CMYK FOGRA39; web -> kept as sRGB.
+colors:
+  primary: "#1F6FEB"
+  accent: "#F5A524"
+  text: "#1B1B1B"
+  muted: "#6B6B6B"

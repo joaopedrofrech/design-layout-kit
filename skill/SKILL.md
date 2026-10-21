@@ -13,28 +13,31 @@ This skill only builds the kit. Combine it freely with any other skill or tool a
 Look at the attachments first. Need: size/orientation/pages (any size, mm), targets (`print`, `web` or both), bleed (default 0), brand colors (sample pixels from brand files, don't guess), fonts, logo, references (copy structure, not identity), complete content. PDF metadata: `author` = who made the file (the person or studio; ask once if you don't know it, never assume), `client` = client name (goes to PDF Subject). List content gaps instead of inventing. If the request is clear, start and ask along with the first results.
 
 ## 2. Project structure (always deliver this)
+Everything lives in an art folder from day one (adding arts later changes nothing). Kit folder `kit-<client>[-<project>]`, art folder `<piece>-<size>` (e.g. `menu-a4`), `slug` = `<kit name without kit->-<art folder>` (e.g. `acme-menu-a4`).
 ```
-kit-<client>-<project>-<size>/        e.g. kit-acme-menu-a4  (several arts: kit-<client>-<project>)
+kit-<client>[-<project>]/             e.g. kit-acme
   README.md  AGENTS.md  requirements.txt  .gitignore
-  content.yaml            ALL text, prices, photo names, colors (YAML keys in English)
-  build.py                layout only: fonts, validate(), draw(c, ctx), run(...)
+  brand.yaml              shared: author, client, lang, colors (sRGB hex), web {dpi, quality}
+  arts/
+    <piece>-<size>/       one folder per piece
+      content.yaml        ALL text, prices, photo names, slug, version, title, targets, bleed_mm, page (YAML keys in English)
+      build.py            layout only: fonts, validate(), draw(c, ctx), run(...)
+      dist/v<N>/          generated PDFs (committing them is the user's choice)
   lib/core.py             pipeline: targets, versions, bleed, color, images, naming, web optimize
   lib/check.py            checks any PDF (fonts, vector text, Unicode map, CMYK-only, dpi)
   lib/export_x1a.py       CMYK PDF -> PDF/X-1a:2001
   prep.py + lib/prep.py   image prep: assets/originals/ --prep.yaml--> assets/images/
   prep.yaml               optional per-image recipes (crop, resize, tone, denoise, sharpen, flatten)
-  new_art.py              adds arts/<name>/ (own build.py + content.yaml + dist/) sharing lib/ and assets/
-  brand.yaml              optional shared keys (author, client, lang, colors, web) merged under every art
+  new_art.py              adds arts/<name>/ (copy of an art) sharing lib/ and assets/
   assets/{originals,images,fonts,profiles}/   (originals = untouched sources, images = prepared, profiles/FOGRA39L_coated.icc)
-  dist/v<N>/              generated PDFs (committing them is the user's choice)
 ```
 - `README.md` is for humans (install, build, edit, ~15 lines). `AGENTS.md` is for AIs (rules, block types, hard rules, what not to touch, "after the build send the PDFs from dist/ to the user for preview").
 - `lib/core.py` holds everything that is not layout, so each project only rewrites `draw(c, ctx)`: `ctx.D` content, `ctx.K` colors already in the output color space, `ctx.make_image(img, w_pt, h_pt, photo=True)` returns a JPEG path ready for drawImage, `ctx.warn()`, `ctx.out` (mode, dpi), `ctx.page_size`. It also sets PDF Title/Author/Subject/Lang from the content.
-- `content.yaml` top level: `slug` (= folder name without `kit-`, i.e. `<client>-<project>-<size>`), `version` (delivery version, default 1), `title`, `author`, `client`, `lang`, `targets: [print, web]` (deliverables of the project, set once), `bleed_mm` (real bleed: the page grows, `ctx.page_size` stays the trim size, extend backgrounds by `ctx.bleed`), `page {width_mm,height_mm}`, `web {dpi: 150, quality: 80}`, `colors` (sRGB hex) + content keys. Quote every string, indent with spaces. Content is never hardcoded in `build.py`. `pip install -r requirements.txt` (reportlab, pillow, pikepdf, pyyaml).
-- `build.py` validates content (missing keys, missing image files, unknown blocks) and prints WARNINGS: column overflow, photo below target dpi. CLI: `python3 build.py` builds every target in `targets`; `--target print|web` is only a one-off partial run; `--bump` raises `version` (new `dist/v<N>/`); `--content file.yaml`. Every output is checked right after building and a failed check stops the build.
+- Art `content.yaml` top level: `slug`, `version` (delivery version, default 1), `title`, `targets: [print, web]` (deliverables of the art, set once), `bleed_mm` (real bleed: the page grows, `ctx.page_size` stays the trim size, extend backgrounds by `ctx.bleed`), `page {width_mm,height_mm}` + content keys. `brand.yaml` is merged under it (the art's keys win): `author`, `client` (PDF Subject), `lang`, `web {dpi: 150, quality: 80}`, `colors`. Quote every string, indent with spaces. Content is never hardcoded in `build.py`. `pip install -r requirements.txt` (reportlab, pillow, pikepdf, pyyaml).
+- `build.py` validates content (missing keys, missing image files, unknown blocks) and prints WARNINGS: column overflow, photo below target dpi. CLI: `python3 arts/<art>/build.py` builds every target in `targets`; `--target print|web` is only a one-off partial run; `--bump` raises `version` (new `dist/v<N>/`); `--content file.yaml`. Every output is checked right after building and a failed check stops the build.
 - Photos fill leftover space: compute the free height and adapt the crop (`focus_x`, `focus_y` 0..1), never touch the rest of the layout.
 
-## 3. Targets and output names (`dist/v<N>/<slug>-v<N>-<color>-<dpi>dpi[-<variant>].pdf`)
+## 3. Targets and output names (`arts/<art>/dist/v<N>/<slug>-v<N>-<color>-<dpi>dpi[-<variant>].pdf`)
 | target | file | purpose |
 |---|---|---|
 | print | `<slug>-v<N>-cmyk-fogra39-300dpi.pdf` | pure, editable (CMYK) |
@@ -50,8 +53,8 @@ Versioning: iterate on the same `version`; bump when a new version goes to the c
 - Images, pure outputs (300 dpi at printed size): NEVER downsample; upscale with LANCZOS only if below 300 dpi (warn with the real dpi); UnsharpMask(radius 1.4, percent 55, threshold 2); JPEG quality 100, subsampling 0, dpi tag. Crop the visible area first, then convert.
 - Images, web optimized: build directly at the target dpi (downsample LANCZOS, no upscale), JPEG ~80, then pikepdf `save(linearize=True, compress_streams=True, object_stream_mode=generate)`, set Title/Author/`/Lang`. Never post-compress with Ghostscript (loses accents' Unicode map, recompresses). Expect ~1–2 MB vs ~12 MB for a full A4 photo menu.
 
-## 4a. More than one art (only when needed)
-One art at the root is the default. Same layout with other content/size: another content file, `python3 build.py --content <file>` (own `slug`). Different layout: `python3 new_art.py <name> --slug <client>-<project>-<size>` creates `arts/<name>/{build.py,content.yaml}`, run with `python3 arts/<name>/build.py`; `dist/` and `version` are per art. `lib/`, fonts, images and the ICC profile are shared from the kit root (`P()` looks in the art folder, then the root); never copy `lib/` into an art. `brand.yaml` (optional, kit root) is merged under every art's content, the art's keys win. A full run cleans only its own slug's files of that version. For a new art of the same client, reuse its brand, fonts and images.
+## 4a. More than one art
+Another piece: `python3 new_art.py <name>` copies an art into `arts/<name>/` (own layout, size, `version`, `dist/`; slug defaults to `<kit>-<name>`), run with `python3 arts/<name>/build.py`. Same layout with other content/size: another content file in the art folder, `build.py --content <file>` (own `slug`). `lib/`, fonts, images, the ICC profile and `brand.yaml` are shared from the kit root (`P()` looks in the art folder, then the root); never copy `lib/` into an art. A full run cleans only its own slug's files of that version. For a new art of the same client, reuse its brand, fonts and images before asking for them again.
 
 ## 4b. Image prep (before layout)
 - Optional and minimal: edit an image only for a visible problem or a needed crop (no default denoise, sharpening or tone); an image that needs nothing goes straight into `assets/images/`. Originals live in `assets/originals/` and are never modified; `prep.yaml` recipes produce `assets/images/` (the only folder the layout reads). `python3 prep.py` runs them (`--only NAME`; `--report` lists px, MP, profile and max print size at 300 dpi). Run `--report` first: a photo too small for its printed size needs a larger original or a real upscale, not a bigger `resize`.

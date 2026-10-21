@@ -8,7 +8,7 @@ draw(c, ctx) — the layout. Everything else lives here:
     run(draw, base_dir=BASE, font="Body", validate=validate)
 
 ctx (passed to draw):
-    ctx.D            content (dict from content.yaml)
+    ctx.D            content (the art's content.yaml merged over ../../brand.yaml)
     ctx.out          current output: mode (cmyk|rgb), dpi, quality, up, down, optimize, suffix, x1a
     ctx.K            colors by name from content "colors" (reportlab colors, already in the output space)
     ctx.white        white in the output space
@@ -238,7 +238,7 @@ def run(draw, base_dir, font, validate=None):
 
     ctx = Ctx(D, base_dir, kit)
     if not D.get("author"):
-        print("  • 'author' is empty in content.yaml (PDF metadata): ask who signs the file.")
+        print("  • 'author' is empty (brand.yaml or content.yaml): ask who signs the file.")
     dist = os.path.join(base_dir, "dist", f"v{ctx.version}")
     os.makedirs(dist, exist_ok=True)
     if not args.target:                       # full run: only this slug's files of this version are cleaned

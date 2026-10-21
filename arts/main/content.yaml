@@ -1,28 +1,19 @@
 # =====================================================================
-#  STARTER — editable content (YAML)
+#  ART CONTENT — editable (YAML)
 # =====================================================================
-#  Edit this file, then run:  python3 build.py
+#  Edit this file, then run:  python3 arts/<this-folder>/build.py
+#  Shared keys (author, client, lang, colors, web) live in ../../brand.yaml; set any of them
+#  here only to override them for this art.
 #  Keys are English (code); values are the content language.
 #  Indent with SPACES (never tabs). Keep texts in "double quotes".
 # =====================================================================
 
-slug: "client-project-a4"          # base of every output file name: <client>-<project>-<size>
-version: 1                     # bump when you deliver a new version to the client (or: python3 build.py --bump)
+slug: "client-project-a4"          # base of every output file name: <kit-name>-<art-folder>, e.g. acme-menu-a4
+version: 1                     # bump when you deliver a new version to the client (or: --bump)
 title: "Document title"        # PDF metadata
-author: ""                    # who made the file (your name or studio) -> PDF Author. Empty = the AI asks.
-client: "Client name"      # PDF Subject metadata
-lang: "en"                     # PDF language (pt-BR, en, ...)
-targets: [print, web]         # deliverables of this project (set once): print, web or both
+targets: [print, web]         # deliverables of this art (set once): print, web or both
 bleed_mm: 0                    # real bleed: >0 makes the PDF page larger; draw() backgrounds extend by ctx.bleed
 page: {width_mm: 210, height_mm: 297}   # any size (A4 shown)
-web: {dpi: 150, quality: 80}   # optimized web version: image dpi / JPEG quality
-
-# sRGB hex. print -> converted to CMYK FOGRA39; web -> kept as sRGB.
-colors:
-  primary: "#1F6FEB"
-  accent: "#F5A524"
-  text: "#1B1B1B"
-  muted: "#6B6B6B"
 
 # ---- example layout content (build.py reads these; change freely with the layout)
 header: "Studio name"

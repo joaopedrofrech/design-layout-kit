@@ -3,20 +3,21 @@
 pdf-layout-starter. Content and layout are separate. Code, keys, folders: English. Content values: the client's language.
 
 ## Rules
-- Content change → edit only `content.yaml`, then `python3 build.py`.
-- Layout change → edit `draw(c, ctx)` in `build.py` (one `c.showPage()` per page). Never fork `lib/`.
-- New project → copy the folder; set slug/title/author/lang/page/colors; rewrite `draw()`, `validate()` and the example keys in `content.yaml`; register fonts in `build.py`.
-- Never edit `dist/` (generated). After any layout change run `python3 build.py` (all targets); `--target` is only for one partial run.
-- Delivering a new version to the client → `python3 build.py --bump` (writes `dist/v<N>/`; older versions stay). Same version while iterating.
+- Content change → edit only the art's `content.yaml` (or `brand.yaml` for shared keys), then `python3 arts/<art>/build.py`.
+- Layout change → edit `draw(c, ctx)` in `arts/<art>/build.py` (one `c.showPage()` per page). Never fork `lib/`.
+- New project → copy the folder; rename `arts/main/`; set slug/title/page in its `content.yaml` and author/client/lang/colors in `brand.yaml`; rewrite `draw()`, `validate()` and the example keys; register fonts in `build.py`.
+- Never edit `dist/` (generated). After any layout change run `python3 arts/<art>/build.py` (all targets); `--target` is only for one partial run.
+- Delivering a new version to the client → `python3 arts/<art>/build.py --bump` (writes `arts/<art>/dist/v<N>/`; older versions stay). Same version while iterating.
 - Touching `lib/` → run `python3 -m unittest` (must stay green).
 - Image changes → edit `prep.yaml`, run `python3 prep.py`, then build.
 - After the build, send the PDFs from `dist/` to the user for preview.
-- Naming: folder `kit-<client>-<project>-<size>`, `slug` = same without `kit-`.
 
-## More than one art
-- Default is one art at the root. Variation with the same layout → another content file + `python3 build.py --content <file>` (own `slug`). Different layout → `python3 new_art.py <name> --slug <client>-<project>-<size>` → `arts/<name>/{build.py,content.yaml}`, built with `python3 arts/<name>/build.py`; its `dist/` and `version` are its own.
-- `lib/`, fonts, images and the ICC profile are shared from the kit root (`P(...)` looks in the art folder first, then the root). Never copy `lib/` into an art.
-- Optional `brand.yaml` at the kit root holds shared keys (`author`, `client`, `lang`, `colors`, `web`); the art's `content.yaml` overrides it. When asked for a new art of the same client, reuse its brand, fonts and images before asking for them again.
+## Structure
+`arts/<art>/{build.py,content.yaml,dist/}` per piece; shared at the kit root: `brand.yaml`, `assets/`, `lib/`, `prep.py`, `prep.yaml`, `new_art.py`. The starter ships `arts/main/`: rename it to the piece. Kit folder `kit-<client>[-<project>]`, art folder `<piece>-<size>` (e.g. `menu-a4`), `slug` = `<kit name without kit->-<art folder>`.
+- Another piece → `python3 new_art.py <name>` (copies an art into `arts/<name>/`), run with `python3 arts/<name>/build.py`; `dist/` and `version` are per art.
+- Same layout, other content or size → another content file in the art folder + `python3 arts/<art>/build.py --content <file>` (own `slug`).
+- `lib/`, fonts, images and the ICC profile are shared (`P(...)` looks in the art folder first, then the kit root). Never copy `lib/` into an art.
+- `brand.yaml` holds `author`, `client`, `lang`, `colors`, `web`; an art's `content.yaml` overrides any of them. For a new art of the same client, reuse its brand, fonts and images before asking for them again.
 
 ## Image prep (`prep.py`, `prep.yaml`, `lib/prep.py`)
 - Optional and minimal: edit an image only when it has a visible problem or the layout needs a crop. No default denoise, sharpening or tone. An image that needs nothing goes straight into `assets/images/`.
@@ -26,21 +27,21 @@ pdf-layout-starter. Content and layout are separate. Code, keys, folders: Englis
 - Before layout work run `python3 prep.py --report`: a photo below 300 dpi at its printed size needs a larger original or a real upscale, not a bigger `resize`.
 
 ## What `lib/core.py` does for you
-- targets: `print` → `cmyk-fogra39-300dpi.pdf` + `-pdfx1a.pdf`; `web` → `rgb-300dpi.pdf` + `rgb-<dpi>dpi-web.pdf`. Files: `dist/v<version>/<slug>-v<version>-<suffix>.pdf`.
+- targets: `print` → `cmyk-fogra39-300dpi.pdf` + `-pdfx1a.pdf`; `web` → `rgb-300dpi.pdf` + `rgb-<dpi>dpi-web.pdf`. Files: `arts/<art>/dist/v<version>/<slug>-v<version>-<suffix>.pdf`.
 - checks every output after building (`lib/check.py`): fonts embedded, vector text present, Unicode map, CMYK-only (print), image dpi. A failure stops the build.
-- `ctx.K.<name>` colors from `content.yaml → colors`, already in the output color space (CMYK FOGRA39 or sRGB); `ctx.white`.
+- `ctx.K.<name>` colors from `brand.yaml → colors`, already in the output color space (CMYK FOGRA39 or sRGB); `ctx.white`.
 - `ctx.make_image(pil_image, w_pt, h_pt, photo=True)` → JPEG path for `drawImage`: print/pure never downsample (upscale only below 300 dpi); web downsamples to `web.dpi`. Pass `photo=False` for flat logos.
 - `ctx.warn(msg)`, `ctx.P(path)`, `ctx.page_size` (TRIM size), `ctx.bleed` (pt), `ctx.version`, `ctx.out` (mode, dpi, up, down), `ctx.D` (content).
 - With `bleed_mm > 0` the page is larger and the origin is shifted to the trim corner: draw as usual, extend full-page backgrounds by `ctx.bleed` on every side.
 - Canvas gets `initialFontName` and `enforceColorSpace` automatically (no unembedded Helvetica; wrong color space errors).
 
-## content.yaml (top-level)
-`slug` · `version` · `title` · `author` (who made the file) · `client` (PDF Subject) · `lang` · `targets` (list: print, web) · `bleed_mm` · `page {width_mm,height_mm}` · `web {dpi,quality}` · `colors` (sRGB hex) + whatever keys the layout reads. If `author` is empty, ask the user who signs the file (and set `client`). Quote every string; indent with spaces.
+## content.yaml (per art) and brand.yaml (shared)
+Art: `slug` · `version` · `title` · `targets` (list: print, web) · `bleed_mm` · `page {width_mm,height_mm}` + whatever keys the layout reads. Brand: `author` (who made the file) · `client` (PDF Subject) · `lang` · `web {dpi,quality}` · `colors` (sRGB hex). If `author` is empty, ask the user who signs the file (and set `client`). Quote every string; indent with spaces.
 
 ## Hard rules
 - Use the images through `ctx.make_image` (never `drawImage` on the raw file).
 - Don't delete "unused" fonts from page resources (shared across pages).
 - X-1a is the direct pikepdf method; Ghostscript only for third-party RGB/transparency PDFs (`lib/export_x1a.py --force-gs`), since it recompresses photos and drops accents' Unicode map.
 - Web optimized is built at the target dpi, never post-compressed.
-- Verify: the build already checks every file; to re-check use `python3 lib/check.py dist/v<N>/*.pdf`. Never describe a PDF you did not check. The X-1a report is structural, not a certification.
+- Verify: the build already checks every file; to re-check use `python3 lib/check.py arts/<art>/dist/v<N>/*.pdf`. Never describe a PDF you did not check. The X-1a report is structural, not a certification.
 - Ghostscript on PDFs with transparency can flatten whole pages into images (no text): the checklist fails that case, do not deliver it.
