@@ -1,7 +1,7 @@
 # =====================================================================
-#  BRAND — shared by every art in arts/ (YAML)
+#  BRAND — shared by every design in designs/ (YAML)
 # =====================================================================
-#  An art's own content.yaml can override any key. Indent with spaces, quote strings.
+#  A design's own content.yaml can override any key. Indent with spaces, quote strings.
 
 author: ""                     # who made the file (your name or studio) -> PDF Author. Empty = the AI asks.
 client: "Client name"          # PDF Subject metadata

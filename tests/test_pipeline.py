@@ -32,8 +32,8 @@ def copy_project():
     return proj
 
 
-def edit(proj, pattern, repl, brand=False, art="main"):
-    p = os.path.join(proj, "brand.yaml") if brand else os.path.join(proj, "arts", art, "content.yaml")
+def edit(proj, pattern, repl, brand=False, design="main"):
+    p = os.path.join(proj, "brand.yaml") if brand else os.path.join(proj, "designs", design, "content.yaml")
     with open(p, encoding="utf-8") as f:
         t = f.read()
     t2 = re.sub(pattern, repl, t, count=1, flags=re.M)
@@ -42,12 +42,12 @@ def edit(proj, pattern, repl, brand=False, art="main"):
         f.write(t2)
 
 
-def build(proj, *args, art="main"):
-    return subprocess.run([sys.executable, f"arts/{art}/build.py", *args], cwd=proj, capture_output=True, text=True)
+def build(proj, *args, design="main"):
+    return subprocess.run([sys.executable, f"designs/{design}/build.py", *args], cwd=proj, capture_output=True, text=True)
 
 
-def pdfs(proj, version=1, art="main"):
-    return sorted(glob.glob(os.path.join(proj, "arts", art, "dist", f"v{version}", "*.pdf")))
+def pdfs(proj, version=1, design="main"):
+    return sorted(glob.glob(os.path.join(proj, "designs", design, "dist", f"v{version}", "*.pdf")))
 
 
 def pick(files, tail):
@@ -151,7 +151,7 @@ class PartialAndVersions(unittest.TestCase):
         v1 = {os.path.basename(f) for f in pdfs(self.proj, 1)}
         r = build(self.proj, "--bump")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        with open(os.path.join(self.proj, "arts", "main", "content.yaml"), encoding="utf-8") as f:
+        with open(os.path.join(self.proj, "designs", "main", "content.yaml"), encoding="utf-8") as f:
             self.assertIn("version: 2", f.read())
         self.assertEqual({os.path.basename(f) for f in pdfs(self.proj, 1)}, v1)
         v2 = pdfs(self.proj, 2)
@@ -184,47 +184,47 @@ class Bleed(unittest.TestCase):
                     self.assertAlmostEqual(tb[3] - tb[1], 297 * MM, delta=0.5)
 
 
-class MultiArt(unittest.TestCase):
+class MultiDesign(unittest.TestCase):
     def setUp(self):
         self.proj = copy_project()
 
-    def new_art(self, *args):
-        return subprocess.run([sys.executable, "new_art.py", *args], cwd=self.proj, capture_output=True, text=True)
+    def new_design(self, *args):
+        return subprocess.run([sys.executable, "new_design.py", *args], cwd=self.proj, capture_output=True, text=True)
 
     def test_starter_has_one_art_in_arts_main_and_nothing_buildable_at_root(self):
-        self.assertTrue(os.path.exists(os.path.join(self.proj, "arts", "main", "build.py")))
+        self.assertTrue(os.path.exists(os.path.join(self.proj, "designs", "main", "build.py")))
         self.assertTrue(os.path.exists(os.path.join(self.proj, "brand.yaml")))
         self.assertFalse(os.path.exists(os.path.join(self.proj, "build.py")))
 
-    def test_new_art_builds_in_its_own_folder_with_shared_assets(self):
-        r = self.new_art("flyer", "--slug", "acme-flyer-a5")
+    def test_new_design_builds_in_its_own_folder_with_shared_assets(self):
+        r = self.new_design("flyer", "--slug", "acme-flyer-a5")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        r = build(self.proj, "--target", "web", art="flyer")
+        r = build(self.proj, "--target", "web", design="flyer")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        got = sorted(os.listdir(os.path.join(self.proj, "arts", "flyer", "dist", "v1")))
+        got = sorted(os.listdir(os.path.join(self.proj, "designs", "flyer", "dist", "v1")))
         self.assertEqual(got, ["acme-flyer-a5-v1-rgb-150dpi-web.pdf", "acme-flyer-a5-v1-rgb-300dpi.pdf"])
-        self.assertFalse(os.path.exists(os.path.join(self.proj, "arts", "main", "dist")))   # other art untouched
+        self.assertFalse(os.path.exists(os.path.join(self.proj, "designs", "main", "dist")))   # other design untouched
 
-    def test_new_art_default_slug_comes_from_kit_and_art_names(self):
-        self.assertEqual(self.new_art("flyer-a5").returncode, 0)
-        with open(os.path.join(self.proj, "arts", "flyer-a5", "content.yaml"), encoding="utf-8") as f:
+    def test_new_design_default_slug_comes_from_kit_and_art_names(self):
+        self.assertEqual(self.new_design("flyer-a5").returncode, 0)
+        with open(os.path.join(self.proj, "designs", "flyer-a5", "content.yaml"), encoding="utf-8") as f:
             self.assertIn('slug: "acme-test-flyer-a5"', f.read())
 
-    def test_new_art_refuses_existing_and_bad_names(self):
-        self.assertEqual(self.new_art("a").returncode, 0)
+    def test_new_design_refuses_existing_and_bad_names(self):
+        self.assertEqual(self.new_design("a").returncode, 0)
         for name in ("a", "Bad Name", "main"):
-            self.assertNotEqual(self.new_art(name).returncode, 0)
+            self.assertNotEqual(self.new_design(name).returncode, 0)
 
     def test_second_content_file_does_not_delete_the_first(self):
         self.assertEqual(build(self.proj).returncode, 0)
         before = {os.path.basename(f) for f in pdfs(self.proj)}
-        art = os.path.join(self.proj, "arts", "main")
-        shutil.copy(os.path.join(art, "content.yaml"), os.path.join(art, "content-b.yaml"))
-        with open(os.path.join(art, "content-b.yaml"), encoding="utf-8") as f:
+        design = os.path.join(self.proj, "designs", "main")
+        shutil.copy(os.path.join(design, "content.yaml"), os.path.join(design, "content-b.yaml"))
+        with open(os.path.join(design, "content-b.yaml"), encoding="utf-8") as f:
             text = f.read().replace('slug: "client-project-a4"', 'slug: "variation-a4"')
-        with open(os.path.join(art, "content-b.yaml"), "w", encoding="utf-8") as f:
+        with open(os.path.join(design, "content-b.yaml"), "w", encoding="utf-8") as f:
             f.write(text)
-        r = build(self.proj, "--content", os.path.join(art, "content-b.yaml"))
+        r = build(self.proj, "--content", os.path.join(design, "content-b.yaml"))
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         after = {os.path.basename(f) for f in pdfs(self.proj)}
         self.assertTrue(before <= after)
@@ -238,20 +238,20 @@ class MultiArt(unittest.TestCase):
             with pikepdf.open(f) as p:
                 self.assertEqual(str(p.docinfo["/Author"]), "Brand Author")
                 self.assertEqual(str(p.docinfo["/Subject"]), "Brand Client")
-        edit(self.proj, r'^title:', 'author: "Art Author"\ntitle:')
+        edit(self.proj, r'^title:', 'author: "Design Author"\ntitle:')
         self.assertEqual(build(self.proj, "--target", "web").returncode, 0)
         with pikepdf.open(pdfs(self.proj)[0]) as p:
-            self.assertEqual(str(p.docinfo["/Author"]), "Art Author")
+            self.assertEqual(str(p.docinfo["/Author"]), "Design Author")
 
     def test_two_arts_share_brand_colors(self):
-        self.assertEqual(self.new_art("flyer").returncode, 0)
+        self.assertEqual(self.new_design("flyer").returncode, 0)
         edit(self.proj, r'primary: "#1F6FEB"', 'primary: "#FF0000"', brand=True)
         from lib.core import load_content
-        for art in ("main", "flyer"):
-            D = load_content(os.path.join(self.proj, "arts", art, "content.yaml"), self.proj)
+        for design in ("main", "flyer"):
+            D = load_content(os.path.join(self.proj, "designs", design, "content.yaml"), self.proj)
             self.assertEqual(D["colors"]["primary"], "#FF0000")
             self.assertEqual(D["colors"]["accent"], "#F5A524")          # untouched brand keys still merge in
-            self.assertEqual(build(self.proj, "--target", "web", art=art).returncode, 0)
+            self.assertEqual(build(self.proj, "--target", "web", design=design).returncode, 0)
 
 
 class Validation(unittest.TestCase):

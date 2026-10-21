@@ -8,14 +8,15 @@ draw(c, ctx) — the layout. Everything else lives here:
     run(draw, base_dir=BASE, font="Body", validate=validate)
 
 ctx (passed to draw):
-    ctx.D            content (the art's content.yaml merged over ../../brand.yaml)
+    ctx.D            content (the design's content.yaml merged over ../../brand.yaml)
     ctx.out          current output: mode (cmyk|rgb), dpi, quality, up, down, optimize, suffix, x1a
     ctx.K            colors by name from content "colors" (reportlab colors, already in the output space)
     ctx.white        white in the output space
-    ctx.P(*parts)    path relative to the art folder, falling back to the kit root (shared assets)
+    ctx.P(*parts)    path relative to the design folder, falling back to the kit root (shared assets)
     ctx.make_image(PIL image, w_pt, h_pt, photo=True) -> temp JPEG path ready for drawImage
     ctx.warn(msg)    collected and printed after each output
     ctx.page_size    (width, height) of the TRIM size in points (draw as if there were no bleed)
+                     `page` in content.yaml: {width_mm,height_mm}, a preset (a4, a5-landscape, letter), "210x297mm" or "1080x1350px"
     ctx.bleed        bleed in points (0 by default); with bleed_mm > 0 the PDF page is larger and the origin
                      is already shifted, so extend full-page backgrounds by ctx.bleed on every side
     ctx.version      project version (content.yaml `version`), outputs go to dist/v<version>/
@@ -37,7 +38,7 @@ MM = 72 / 25.4
 
 
 def kit_root(here):
-    """Folder that holds lib/core.py: `here` itself, or the nearest parent (an art in arts/<name>/)."""
+    """Folder that holds lib/core.py: `here` itself, or the nearest parent (a design in designs/<name>/)."""
     p = os.path.abspath(here)
     while not os.path.exists(os.path.join(p, "lib", "core.py")):
         if p == os.path.dirname(p):
@@ -47,7 +48,7 @@ def kit_root(here):
 
 
 def resolver(here, kit):
-    """P(*parts): path inside the art folder if it exists there, else inside the kit root (shared assets)."""
+    """P(*parts): path inside the design folder if it exists there, else inside the kit root (shared assets)."""
     def P(*parts):
         own = os.path.join(here, *parts)
         if os.path.exists(own):
@@ -58,7 +59,7 @@ def resolver(here, kit):
 
 
 def load_content(path, kit=None):
-    """Reads the YAML. If brand.yaml exists in the kit root it is merged underneath (the art's keys win;
+    """Reads the YAML. If brand.yaml exists in the kit root it is merged underneath (the design's keys win;
     `colors` and `web` are merged key by key)."""
     try:
         import yaml
@@ -85,23 +86,59 @@ def load_content(path, kit=None):
     return D
 
 
+PAGE_PRESETS_MM = {"a3": (297, 420), "a4": (210, 297), "a5": (148, 210), "a6": (105, 148),
+                   "letter": (215.9, 279.4), "legal": (215.9, 355.6)}
+
+
+def parse_page(pg):
+    """`page` -> (width_pt, height_pt, in_pixels).
+    Accepts {width_mm, height_mm}, a preset ("a4", "a5-landscape", "letter"), "210x297mm" or "1080x1350px"
+    (a pixel page is 1 px = 1 pt, so it renders 1:1 at 72 dpi)."""
+    if pg is None:
+        return A4[0], A4[1], False
+    if isinstance(pg, dict):
+        return pg["width_mm"] * MM, pg["height_mm"] * MM, False
+    s = str(pg).strip().lower()
+    m = re.fullmatch(r"([\d.]+)\s*x\s*([\d.]+)\s*(mm|px)", s)
+    if m:
+        w, h = float(m.group(1)), float(m.group(2))
+        return (w * MM, h * MM, False) if m.group(3) == "mm" else (w, h, True)
+    name, land = (s[:-10], True) if s.endswith("-landscape") else (s, False)
+    if name in PAGE_PRESETS_MM:
+        w, h = PAGE_PRESETS_MM[name]
+        return ((h, w) if land else (w, h))[0] * MM, ((h, w) if land else (w, h))[1] * MM, False
+    raise ValueError(f"page: unknown value {pg!r} (use {sorted(PAGE_PRESETS_MM)}, optional -landscape, "
+                     f"\"210x297mm\", \"1080x1350px\" or {{width_mm, height_mm}})")
+
+
 def base_errors(D):
     err = [f"missing key: {k}" for k in ("slug", "title") if k not in D]
-    if not set(D.get("targets", ["print", "web"])) <= {"print", "web"}:
-        err.append("targets must be a list with print and/or web")
+    if not set(D.get("targets", ["print", "web"])) <= {"print", "web", "image"}:
+        err.append("targets must be a list with print, web and/or image")
+    try:
+        parse_page(D.get("page"))
+    except (ValueError, KeyError, TypeError) as e:
+        err.append(str(e) if isinstance(e, ValueError) else "page: expected {width_mm, height_mm}")
+    im = D.get("image") or {}
+    if not set(im.get("formats", ["png"])) <= {"png", "jpg"}:
+        err.append("image.formats must be a list with png and/or jpg")
     return err
 
 
-def outputs(target, web):
-    """print -> pure CMYK (+ X-1a).  web -> pure sRGB + optimized sRGB."""
+def outputs(target, D, ctx):
+    """print -> pure CMYK (+ X-1a).  web -> pure sRGB + optimized sRGB.  image -> PNG/JPG of every page."""
     if target == "print":
         return [SimpleNamespace(mode="cmyk", dpi=300, quality=100, up=True, down=False,
-                                optimize=False, suffix="cmyk-fogra39-300dpi", x1a=True)]
+                                optimize=False, suffix="cmyk-fogra39-300dpi", x1a=True, image=False)]
+    if target == "image":
+        return [SimpleNamespace(mode="rgb", dpi=ctx.image_dpi, quality=100, up=False, down=True,
+                                optimize=False, suffix=None, x1a=False, image=True)]
+    web = D.get("web")
     wd, wq = int((web or {}).get("dpi", 150)), int((web or {}).get("quality", 80))
     return [SimpleNamespace(mode="rgb", dpi=300, quality=100, up=True, down=False,
-                            optimize=False, suffix="rgb-300dpi", x1a=False),
+                            optimize=False, suffix="rgb-300dpi", x1a=False, image=False),
             SimpleNamespace(mode="rgb", dpi=wd, quality=wq, up=False, down=True,
-                            optimize=True, suffix=f"rgb-{wd}dpi-web", x1a=False)]
+                            optimize=True, suffix=f"rgb-{wd}dpi-web", x1a=False, image=False)]
 
 
 class Ctx:
@@ -115,12 +152,22 @@ class Ctx:
         self.warnings = []
         self._n = 0
         self.tmp = tempfile.mkdtemp(prefix="pdfkit_")
-        self.page_size = A4
-        pg = D.get("page")
-        if pg:
-            self.page_size = (pg["width_mm"] * MM, pg["height_mm"] * MM)
-        self.bleed = float(D.get("bleed_mm", 0)) * MM
-        self.full_size = (self.page_size[0] + 2 * self.bleed, self.page_size[1] + 2 * self.bleed)
+        w, h, self.page_in_px = parse_page(D.get("page"))
+        self.page_size = (w, h)
+        self.bleed_cfg = float(D.get("bleed_mm", 0)) * MM
+        self.bleed, self.full_size = self.bleed_cfg, self.page_size
+        self._set_bleed(self.bleed_cfg)
+        im = D.get("image") or {}
+        self.image_formats = list(im.get("formats", ["png"]))
+        self.image_quality = int(im.get("quality", 92))
+        self.image_transparent = bool(im.get("transparent", False))
+        if im.get("width_px"):
+            self.image_width_px = int(im["width_px"])
+        elif not im.get("dpi") and self.page_in_px:
+            self.image_width_px = round(w)
+        else:
+            self.image_width_px = None
+        self.image_dpi = (self.image_width_px / (w / 72)) if self.image_width_px else float(im.get("dpi", 150))
         self.version = int(D.get("version", 1))
         icc = os.path.join(self.kit, "assets", "profiles", "FOGRA39L_coated.icc")
         srgb = ImageCms.createProfile("sRGB")
@@ -129,6 +176,10 @@ class Ctx:
                                              renderingIntent=ImageCms.Intent.RELATIVE_COLORIMETRIC)
         self._photo = ImageCms.buildTransform(srgb, fogra, "RGB", "CMYK",
                                               renderingIntent=ImageCms.Intent.PERCEPTUAL)
+
+    def _set_bleed(self, b):
+        self.bleed = b
+        self.full_size = (self.page_size[0] + 2 * b, self.page_size[1] + 2 * b)
 
     def warn(self, msg):
         self.warnings.append(msg)
@@ -143,6 +194,7 @@ class Ctx:
 
     def use(self, out):
         self.out = out
+        self._set_bleed(0.0 if out.image else self.bleed_cfg)     # images are the trim area only
         self.warnings.clear()
         for k, v in (self.D.get("colors") or {}).items():
             setattr(self.K, k, self.color(v))
@@ -160,7 +212,7 @@ class Ctx:
                 im = im.resize((mw, mh), Image.LANCZOS)
             im = im.filter(ImageFilter.UnsharpMask(radius=1.4, percent=55, threshold=2))
         else:
-            im = im.resize((mw, mh), Image.LANCZOS)      # flat art (logos): always exact size
+            im = im.resize((mw, mh), Image.LANCZOS)      # flat design (logos): always exact size
         if o.mode == "cmyk":
             im = ImageCms.applyTransform(im, self._photo if photo else self._flat)
         self._n += 1
@@ -217,9 +269,43 @@ def optimize_web(path, D):
                  object_stream_mode=pikepdf.ObjectStreamMode.generate)
 
 
+def rasterize(pdf_path, dist, base_name, ctx):
+    """PDF pages -> PNG/JPG files in dist. Returns the list of written paths."""
+    try:
+        import pypdfium2 as pdfium
+    except ImportError:
+        sys.exit("Missing pypdfium2:  pip install -r requirements.txt")
+    pdf = pdfium.PdfDocument(pdf_path)
+    n, written = len(pdf), []
+    fill = (0, 0, 0, 0) if ctx.image_transparent else (255, 255, 255, 255)
+    for i in range(n):
+        page = pdf[i]
+        im = page.render(scale=ctx.image_dpi / 72, fill_color=fill).to_pil()
+        if ctx.image_width_px:                              # exact width; height from the page ratio
+            pw, ph = page.get_size()
+            target = (ctx.image_width_px, round(ctx.image_width_px * ph / pw))
+            if im.size != target:
+                im = im.resize(target, Image.LANCZOS)
+        name = f"{base_name}-{im.width}x{im.height}px" + (f"-p{i + 1}" if n > 1 else "")
+        for fmt in ctx.image_formats:
+            path = os.path.join(dist, f"{name}.{fmt}")
+            if fmt == "png":
+                (im if ctx.image_transparent else im.convert("RGB")).save(path, "PNG", optimize=True)
+            else:
+                flat = im
+                if im.mode == "RGBA":
+                    flat = Image.new("RGB", im.size, (255, 255, 255))
+                    flat.paste(im, mask=im.getchannel("A"))
+                flat.convert("RGB").save(path, "JPEG", quality=ctx.image_quality, subsampling=0,
+                                         dpi=(round(ctx.image_dpi), round(ctx.image_dpi)))
+            written.append(path)
+    pdf.close()
+    return written
+
+
 def run(draw, base_dir, font, validate=None):
     ap = argparse.ArgumentParser(description="Build PDFs into dist/")
-    ap.add_argument("--target", choices=["print", "web"],
+    ap.add_argument("--target", choices=["print", "web", "image"],
                     help="build only this target (default: every target in 'targets' of the content file)")
     ap.add_argument("--content", default=os.path.join(base_dir, "content.yaml"),
                     help="content file (default content.yaml); another file = a variation with the same layout")
@@ -241,15 +327,21 @@ def run(draw, base_dir, font, validate=None):
         print("  • 'author' is empty (brand.yaml or content.yaml): ask who signs the file.")
     dist = os.path.join(base_dir, "dist", f"v{ctx.version}")
     os.makedirs(dist, exist_ok=True)
+    stem = f"{glob.escape(D['slug'])}-v{ctx.version}-"
+    img_files = lambda: [f for ext in ("png", "jpg") for f in glob.glob(os.path.join(dist, f"{stem}rgb-*px*.{ext}"))]
     if not args.target:                       # full run: only this slug's files of this version are cleaned
-        for old in glob.glob(os.path.join(dist, f"{glob.escape(D['slug'])}-v{ctx.version}-*.pdf")):
+        for old in glob.glob(os.path.join(dist, f"{stem}*.pdf")) + img_files():
+            os.remove(old)
+    elif args.target == "image":
+        for old in img_files():
             os.remove(old)
 
     made = []
-    todo = [o for t in targets for o in outputs(t, D.get("web"))]
+    todo = [o for t in targets for o in outputs(t, D, ctx)]
     for out in todo:
         ctx.use(out)
-        path = os.path.join(dist, f"{D['slug']}-v{ctx.version}-{out.suffix}.pdf")
+        path = (os.path.join(ctx.tmp, "image-source.pdf") if out.image
+                else os.path.join(dist, f"{D['slug']}-v{ctx.version}-{out.suffix}.pdf"))
         for old in (path, path[:-4] + "-pdfx1a.pdf"):     # replace only what is rebuilt
             if os.path.exists(old):
                 os.remove(old)
@@ -263,8 +355,9 @@ def run(draw, base_dir, font, validate=None):
         c.save()
         if out.optimize:
             optimize_web(path, D)
-        made.append(path)
-        print(f"OK  {os.path.basename(path)}")
+        if not out.image:
+            made.append(path)
+            print(f"OK  {os.path.basename(path)}")
         for w in ctx.warnings:
             print("  •", w)
         sys.path.insert(0, kit)
@@ -276,6 +369,10 @@ def run(draw, base_dir, font, validate=None):
                 print(f"  [FAIL]  {name} {detail}")
         if failed(results):
             sys.exit("Output check failed — see above.")
+        if out.image:
+            for img in rasterize(path, dist, f"{D['slug']}-v{ctx.version}-rgb", ctx):
+                made.append(img)
+                print(f"OK  {os.path.basename(img)}")
         if out.x1a and D.get("x1a", True):
             sys.path.insert(0, kit)
             from lib.export_x1a import export

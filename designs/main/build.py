@@ -2,10 +2,10 @@
 """
 Starter — one-page example layout. Replace draw() with the real layout for each project.
 
-    python3 arts/<art>/build.py                  # every target in `targets` of the art's content.yaml
-    python3 arts/<art>/build.py --target web     # one run, only this target: print | web
+    python3 designs/<design>/build.py                  # every target in `targets` of the design's content.yaml
+    python3 designs/<design>/build.py --target web     # one run, only this target: print | web
 
-Outputs in arts/<art>/dist/v<N>/  (<slug>-v<N>-<color>-<dpi>dpi[-<variant>].pdf):
+Outputs in designs/<design>/dist/v<N>/  (<slug>-v<N>-<color>-<dpi>dpi[-<variant>].pdf):
   print  cmyk-fogra39-300dpi.pdf (pure, editable) + cmyk-fogra39-300dpi-pdfx1a.pdf (printer)
   web    rgb-300dpi.pdf (pure, editable)          + rgb-150dpi-web.pdf (light, linearized)
 
@@ -21,12 +21,12 @@ from reportlab.pdfbase.ttfonts import TTFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 KIT = HERE                                     # kit root = nearest folder with lib/core.py (this one, or a parent when
-while not os.path.exists(os.path.join(KIT, "lib", "core.py")) and KIT != os.path.dirname(KIT):   # this is an art in arts/<name>/)
+while not os.path.exists(os.path.join(KIT, "lib", "core.py")) and KIT != os.path.dirname(KIT):   # this is a design in designs/<name>/)
     KIT = os.path.dirname(KIT)
 sys.path.insert(0, KIT)
 from lib.core import resolver, run  # noqa: E402
 
-P = resolver(HERE, KIT)                        # art folder first, then shared kit assets
+P = resolver(HERE, KIT)                        # design folder first, then shared kit assets
 
 # ---- fonts: register every font used (and set the default in run(font=...))
 for name, file in [("Body", "Poppins-Regular.ttf"), ("BodyMd", "Poppins-Medium.ttf"),
