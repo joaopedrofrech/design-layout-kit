@@ -43,6 +43,7 @@ python3 designs/main/build.py                 # every target of the design
 python3 designs/main/build.py --target web    # one run, only that target (print | web | image)
 python3 designs/main/build.py --bump          # version += 1 (new dist/v<N>/ folder), then build
 python3 build_all.py                       # every design of the kit (--only a,b  --target web)
+python3 build_all.py --zip                 # build everything, then pack exports/<kit>-<date>.zip
 python3 prep.py                            # prepare images (assets/originals -> assets/images)
 python3 lib/check.py designs/main/dist/v1/*.pdf   # re-check any generated PDF
 python3 -m unittest                        # test suite (~50 s)
@@ -51,6 +52,7 @@ python3 -m unittest                        # test suite (~50 s)
 ## More than one design
 - **Another design** (flyer next to the menu): `python3 new_design.py flyer-a5` copies a design into `designs/flyer-a5/` with its own `build.py`, `content.yaml`, version and `dist/`. Fonts, images, color profile and `brand.yaml` stay shared. Run it with `python3 designs/flyer-a5/build.py`.
 - **Everything at once:** `python3 build_all.py` builds every design (`--only menu-a4,flyer-a5`, `--target web`); one failure does not stop the rest and the summary shows which failed. Version bumps stay per design (`build.py --bump`).
+- **Delivery zip:** `python3 build_all.py --zip` rebuilds every design (or `--only`), then packs all generated files of each design's current version into `exports/<kit>-<date>.zip`, one folder per design with the files loose inside. No zip if any build fails; it cannot be combined with `--target`.
 - **Same layout, different content or size** (a variation): copy the design's `content.yaml` to e.g. `content-b.yaml`, give it its own `slug`, and run `python3 designs/<design>/build.py --content designs/<design>/content-b.yaml`.
 - A design can override any `brand.yaml` key in its own `content.yaml`, and can have its own `assets/` (its files win over the shared ones).
 

@@ -154,6 +154,37 @@ class BuildAll(unittest.TestCase):
         self.assertEqual(len(names(self.proj, "main")), 2)
         self.assertIn("FAILED  flyer-a5", r.stdout)
 
+    def zip_names(self):
+        import zipfile
+        import glob
+        z = glob.glob(os.path.join(self.proj, "exports", "*.zip"))
+        self.assertEqual(len(z), 1)
+        return sorted(zipfile.ZipFile(z[0]).namelist())
+
+    def test_zip_builds_then_packs_one_folder_per_design(self):
+        r = self.run_all("--zip")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        zn = self.zip_names()
+        for d in ("main", "flyer-a5"):
+            self.assertEqual(len([n for n in zn if f"/{d}/" in n]), len(names(self.proj, d)), d)
+        self.assertTrue(all(n.count("/") == 2 for n in zn))     # kit/design/file
+
+    def test_zip_only_includes_chosen_designs(self):
+        r = self.run_all("--zip", "--only", "flyer-a5")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertTrue(all("/flyer-a5/" in n for n in self.zip_names()))
+
+    def test_zip_not_created_when_a_build_fails(self):
+        edit(self.proj, r"^title:.*$", "", design="flyer-a5")
+        r = self.run_all("--zip")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertFalse(os.path.exists(os.path.join(self.proj, "exports")))
+
+    def test_zip_rejects_target(self):
+        r = self.run_all("--zip", "--target", "web")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertFalse(os.path.exists(os.path.join(self.proj, "exports")))
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

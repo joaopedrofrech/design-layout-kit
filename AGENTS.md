@@ -16,6 +16,7 @@ pdf-layout-starter. Content and layout are separate. Code, keys, folders: Englis
 `designs/<design>/{build.py,content.yaml,dist/}` per piece; shared at the kit root: `brand.yaml`, `assets/`, `lib/`, `prep.py`, `prep.yaml`, `new_design.py`, `build_all.py`. The starter ships `designs/main/`: rename it to the piece. Kit folder `kit-<client>[-<project>]`, design folder `<piece>-<size>` (e.g. `menu-a4`), `slug` = `<kit name without kit->-<design folder>`.
 - Another design → `python3 new_design.py <name>` (copies a design into `designs/<name>/`), run with `python3 designs/<name>/build.py`; `dist/` and `version` are per design.
 - Everything at once → `python3 build_all.py [--only a,b] [--target web]` (no bump there; bump each design with its own `build.py --bump`).
+- Delivery zip → `python3 build_all.py --zip [--only a,b]`: rebuilds, then writes `exports/<kit>-<date>.zip` (one folder per design, everything generated for its current version). Not with `--target`; no zip if a build fails.
 - Same layout, other content or size → another content file in the design folder + `python3 designs/<design>/build.py --content <file>` (own `slug`).
 - `lib/`, fonts, images and the ICC profile are shared (`P(...)` looks in the design folder first, then the kit root). Never copy `lib/` into a design.
 - `brand.yaml` holds `author`, `client`, `lang`, `colors`, `web`; a design's `content.yaml` overrides any of them. For a new design of the same client, reuse its brand, fonts and images before asking for them again.
