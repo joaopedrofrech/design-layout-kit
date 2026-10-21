@@ -41,7 +41,7 @@ kit-<client>-<project>-<size>/        e.g. kit-acme-menu-a4  (several arts: kit-
 | print | `<slug>-v<N>-cmyk-fogra39-300dpi-pdfx1a.pdf` | PDF/X-1a, goes to the printer |
 | web | `<slug>-v<N>-rgb-300dpi.pdf` | pure, editable (sRGB) |
 | web | `<slug>-v<N>-rgb-150dpi-web.pdf` | optimized: images at `web.dpi`, JPEG `web.quality`, linearized |
-Versioning: iterate on the same `version`; bump when a new version goes to the client. A full run cleans only `dist/v<N>/` (older versions stay); `--target` replaces only its own files. Hyphens only, lowercase, no accents in names. All four files build in seconds.
+Versioning: iterate on the same `version`; bump when a new version goes to the client. A full run cleans only this slug's files in `dist/v<N>/` (older versions stay); `--target` replaces only its own files. Hyphens only, lowercase, no accents in names. All four files build in seconds.
 
 ## 4. Technical rules
 - Text stays VECTOR with embedded fonts, one line = one text object (editable in Affinity/Illustrator/Acrobat). Ship the fonts. Find fonts in /usr/share/fonts, else raw.githubusercontent.com/google/fonts/main/ofl/<FONT>/. FOGRA39 profile: /usr/share/texlive/texmf-dist/tex/generic/colorprofiles/FOGRA39L_coated.icc (copy into assets/profiles).
