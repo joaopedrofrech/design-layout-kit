@@ -2,26 +2,22 @@
 """
 CMYK PDF -> PDF/X-1a:2001 (Coated FOGRA39).
 
-    python3 lib/export_x1a.py in.pdf out.pdf [--title "Name"] [--author "Client"] [--bleed-mm 3] [--force-gs]
+    python3 lib/export_x1a.py in.pdf out.pdf [--title "Name"] [--author "Client"] [--bleed-mm 3]
 
-DEFAULT ("direct", pikepdf only): when the input is clean (CMYK/Gray only, fonts embedded,
-no transparency) nothing is reprocessed — photos, fonts and text (with accents) stay
-byte-identical. It only adds what X-1a requires: OutputIntent FOGRA39 + ICC, GTS_PDFX keys,
-Trapped=False, TrimBox/BleedBox, PDF 1.3, /ID.
+Direct method (pikepdf only): the input must be clean (CMYK/Gray only, fonts embedded, no
+transparency), which is what the kit builds. Nothing is reprocessed — photos, fonts and text
+(with accents) stay byte-identical. It only adds what X-1a requires: OutputIntent FOGRA39 + ICC,
+GTS_PDFX keys, Trapped=False, TrimBox/BleedBox, PDF 1.3, /ID.
 
-FALLBACK (Ghostscript): only for third-party PDFs with RGB/transparency (or --force-gs).
-It rewrites fonts and images (recompresses JPEGs, loses the Unicode map of accents).
-Keep the original as the editable version.
+A PDF that is not clean (RGB, transparency, named color spaces) is refused with the reason:
+rebuild it in CMYK with the kit instead of converting it.
 
 Bleed: --bleed-mm only sets Trim/BleedBox; the INPUT page must already include the bleed.
 """
 import argparse
 import os
 import re
-import shutil
-import subprocess
 import sys
-import tempfile
 from datetime import datetime
 
 try:
@@ -98,61 +94,6 @@ def direct(src, dst, title, author, bleed_mm):
     pdf.close()
 
 
-def _ps_escape(s):
-    return s.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
-
-
-def _gs_def(title):
-    return f"""%!
-[ /GTS_PDFXVersion (PDF/X-1:2001) /GTS_PDFXConformance (PDF/X-1a:2001)
-  /Title ({_ps_escape(title)}) /Trapped /False /DOCINFO pdfmark
-/ICCProfile (profile.icc) def
-[/_objdef {{icc_PDFX}} /type /stream /OBJ pdfmark
-[{{icc_PDFX}} << /N 4 >> /PUT pdfmark
-[{{icc_PDFX}} ICCProfile (r) file /PUT pdfmark
-[/_objdef {{OutputIntent_PDFX}} /type /dict /OBJ pdfmark
-[{{OutputIntent_PDFX}} << /Type /OutputIntent /S /GTS_PDFX
-  /OutputCondition (Coated FOGRA39 (ISO 12647-2:2004))
-  /Info (Coated FOGRA39 (ISO 12647-2:2004))
-  /OutputConditionIdentifier (FOGRA39) /RegistryName (http://www.color.org)
-  /DestOutputProfile {{icc_PDFX}} >> /PUT pdfmark
-[{{Catalog}} <</OutputIntents [ {{OutputIntent_PDFX}} ]>> /PUT pdfmark
-"""
-
-
-def ghostscript(src, dst, title, author, bleed_mm):
-    gs = shutil.which("gs") or shutil.which("gswin64c")
-    if not gs:
-        sys.exit("This PDF needs the Ghostscript method (RGB/transparency) but gs was not found.")
-    tmp = tempfile.mkdtemp(prefix="x1a_")
-    try:
-        shutil.copy(ICC, os.path.join(tmp, "profile.icc"))
-        defps = os.path.join(tmp, "x1a_def.ps")      # never name it PDFX_def.ps (gs loads its own sample)
-        with open(defps, "w", encoding="latin-1", errors="replace") as f:
-            f.write(_gs_def(title))
-        raw = os.path.join(tmp, "raw.pdf")
-        cmd = [gs, "-q", "-dBATCH", "-dNOPAUSE", "-dNOSAFER", "-sDEVICE=pdfwrite",
-               "-dCompatibilityLevel=1.3", "-sColorConversionStrategy=CMYK",
-               "-sProcessColorModel=DeviceCMYK", "-dEmbedAllFonts=true", "-dSubsetFonts=true",
-               "-dDownsampleColorImages=false", "-dDownsampleGrayImages=false",
-               "-dDownsampleMonoImages=false", f"-sOutputFile={raw}", defps, os.path.abspath(src)]
-        r = subprocess.run(cmd, capture_output=True, text=True, cwd=tmp)
-        if r.returncode != 0 or not os.path.exists(raw):
-            sys.exit("Ghostscript failed:\n" + (r.stdout + r.stderr)[-1500:])
-        pdf = pikepdf.open(raw)
-        sg = bleed_mm * MM
-        for pg in pdf.pages:
-            mb = [float(x) for x in pg.MediaBox]
-            pg.TrimBox = pikepdf.Array([mb[0] + sg, mb[1] + sg, mb[2] - sg, mb[3] - sg])
-            pg.BleedBox = pikepdf.Array(mb)
-        pdf.docinfo["/Title"] = pikepdf.String(title)
-        pdf.docinfo["/Author"] = pikepdf.String(author)
-        pdf.save(dst, min_version="1.3", force_version="1.3")
-        pdf.close()
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
-
-
 def report(dst):
     with pikepdf.open(dst) as p:
         info, oi = p.docinfo, p.Root.OutputIntents[0]
@@ -194,22 +135,18 @@ def report(dst):
     return ok
 
 
-def export(src, dst, title=None, author="", bleed_mm=0.0, force_gs=False):
-    """Convert src to PDF/X-1a at dst. Prints the report; returns True if every check passed."""
+def export(src, dst, title=None, author="", bleed_mm=0.0):
+    """Convert a clean CMYK PDF to PDF/X-1a at dst. Prints the report; returns True if every check passed."""
     if not os.path.exists(ICC):
         sys.exit(f"ICC profile not found: {ICC}")
     with pikepdf.open(src) as s:
         title = title or str(s.docinfo.get("/Title", os.path.splitext(os.path.basename(src))[0]))
         issues = analyze(s)
-    if issues or force_gs:
-        print("Method: Ghostscript fallback (X-1a-blocking items):", *issues, sep="\n   - ")
-        print("   WARNING: Ghostscript recompresses photos, may lose accents' Unicode map and, "
-              "with transparency, may flatten whole pages into images (no text left). "
-              "Keep the original as the editable version.")
-        ghostscript(src, dst, title, author, bleed_mm)
-    else:
-        direct(src, dst, title, author, bleed_mm)
-        print("X-1a method: direct (photos, fonts and text preserved byte for byte)")
+    if issues:
+        sys.exit("PDF/X-1a needs a clean CMYK PDF; this one has:\n   - " + "\n   - ".join(issues)
+                 + "\nBuild it in CMYK with the kit (--target print) instead of converting it.")
+    direct(src, dst, title, author, bleed_mm)
+    print("X-1a method: direct (photos, fonts and text preserved byte for byte)")
     print(f"OK  {os.path.basename(dst)}")
     return report(dst)
 
@@ -221,6 +158,5 @@ if __name__ == "__main__":
     ap.add_argument("--title")
     ap.add_argument("--author", default="")
     ap.add_argument("--bleed-mm", type=float, default=0.0)
-    ap.add_argument("--force-gs", action="store_true")
     a = ap.parse_args()
-    sys.exit(0 if export(a.src, a.dst, a.title, a.author, a.bleed_mm, a.force_gs) else 1)
+    sys.exit(0 if export(a.src, a.dst, a.title, a.author, a.bleed_mm) else 1)

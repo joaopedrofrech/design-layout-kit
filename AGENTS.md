@@ -44,7 +44,6 @@ Design: `slug` · `version` · `title` · `targets` (list: print, web) · `bleed
 ## Hard rules
 - Use the images through `ctx.make_image` (never `drawImage` on the raw file).
 - Don't delete "unused" fonts from page resources (shared across pages).
-- X-1a is the direct pikepdf method; Ghostscript only for third-party RGB/transparency PDFs (`lib/export_x1a.py --force-gs`), since it recompresses photos and drops accents' Unicode map.
+- X-1a is the direct pikepdf method only, on the kit's own clean CMYK PDF. No RGB→CMYK conversion of third-party PDFs: a PDF that is not clean is refused; rebuild it with the kit.
 - Web optimized is built at the target dpi, never post-compressed.
 - Verify: the build already checks every file; to re-check use `python3 lib/check.py designs/<design>/dist/*.pdf`. Never describe a PDF you did not check. The X-1a report is structural, not a certification.
-- Ghostscript on PDFs with transparency can flatten whole pages into images (no text): the checklist fails that case, do not deliver it.
