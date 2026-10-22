@@ -5,7 +5,7 @@ Starter — one-page example layout. Replace draw() with the real layout for eac
     python3 designs/<design>/build.py                  # every target in `targets` of the design's content.yaml
     python3 designs/<design>/build.py --target web     # one run, only this target: print | web
 
-Outputs in designs/<design>/dist/v<N>/  (<slug>-v<N>-<color>-<dpi>dpi[-<variant>].pdf):
+Outputs in designs/<design>/dist/  (<slug>-v<N>-<color>-<dpi>dpi[-<variant>].pdf):
   print  cmyk-fogra39-300dpi.pdf (pure, editable) + cmyk-fogra39-300dpi-pdfx1a.pdf (printer)
   web    rgb-300dpi.pdf (pure, editable)          + rgb-150dpi-web.pdf (light, linearized)
 

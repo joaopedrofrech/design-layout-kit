@@ -22,7 +22,7 @@ kit-<client>[-<project>]/             e.g. kit-acme
     <piece>-<size>/       one folder per piece
       content.yaml        ALL text, prices, photo names, slug, version, title, targets, bleed_mm, page (YAML keys in English)
       build.py            layout only: fonts, validate(), draw(c, ctx), run(...)
-      dist/v<N>/          generated PDFs (committing them is the user's choice)
+      dist/               generated files of every version (committing them is the user's choice)
   lib/core.py             pipeline: targets, versions, bleed, color, images, naming, web optimize
   lib/check.py            checks any PDF (fonts, vector text, Unicode map, CMYK-only, dpi)
   lib/export_x1a.py       CMYK PDF -> PDF/X-1a:2001
@@ -34,10 +34,10 @@ kit-<client>[-<project>]/             e.g. kit-acme
 - `README.md` is for humans (install, build, edit, ~15 lines). `AGENTS.md` is for AIs (rules, block types, hard rules, what not to touch, "after the build send the PDFs from dist/ to the user for preview").
 - `lib/core.py` holds everything that is not layout, so each project only rewrites `draw(c, ctx)`: `ctx.D` content, `ctx.K` colors already in the output color space, `ctx.make_image(img, w_pt, h_pt, photo=True)` returns a JPEG path ready for drawImage, `ctx.warn()`, `ctx.out` (mode, dpi), `ctx.page_size`. It also sets PDF Title/Author/Subject/Lang from the content.
 - Design `content.yaml` top level: `slug`, `version` (delivery version, default 1), `title`, `targets: [print, web]` (deliverables of the design, set once), `bleed_mm` (real bleed: the page grows, `ctx.page_size` stays the trim size, extend backgrounds by `ctx.bleed`), `page` (preset `a3 a4 a5 a6 letter legal` + `-landscape`, `"210x297mm"`, `"1080x1350px"` = 1 px = 1 pt, or `{width_mm,height_mm}`), optional `image {formats: [png, jpg], width_px | dpi, quality, transparent}` + content keys. `brand.yaml` is merged under it (the design's keys win): `author`, `client` (PDF Subject), `lang`, `web {dpi: 150, quality: 80}`, `colors`. Quote every string, indent with spaces. Content is never hardcoded in `build.py`. `pip install -r requirements.txt` (reportlab, pillow, pikepdf, pyyaml, pypdfium2).
-- `build.py` validates content (missing keys, missing image files, unknown blocks) and prints WARNINGS: column overflow, photo below target dpi. CLI: `python3 designs/<design>/build.py` builds every target in `targets`; `--target print|web` is only a one-off partial run; `--bump` raises `version` (new `dist/v<N>/`); `--content file.yaml`. Every output is checked right after building and a failed check stops the build.
+- `build.py` validates content (missing keys, missing image files, unknown blocks) and prints WARNINGS: column overflow, photo below target dpi. CLI: `python3 designs/<design>/build.py` builds every target in `targets`; `--target print|web` is only a one-off partial run; `--bump` raises `version` (new `-v<N>-` files in `dist/`); `--content file.yaml`. Every output is checked right after building and a failed check stops the build.
 - Photos fill leftover space: compute the free height and adapt the crop (`focus_x`, `focus_y` 0..1), never touch the rest of the layout.
 
-## 3. Targets and output names (`designs/<design>/dist/v<N>/<slug>-v<N>-<color>-<dpi>dpi[-<variant>].pdf`)
+## 3. Targets and output names (`designs/<design>/dist/<slug>-v<N>-<color>-<dpi>dpi[-<variant>].pdf`)
 | target | file | purpose |
 |---|---|---|
 | print | `<slug>-v<N>-cmyk-fogra39-300dpi.pdf` | pure, editable (CMYK) |
@@ -45,7 +45,7 @@ kit-<client>[-<project>]/             e.g. kit-acme
 | web | `<slug>-v<N>-rgb-300dpi.pdf` | pure, editable (sRGB) |
 | web | `<slug>-v<N>-rgb-150dpi-web.pdf` | optimized: images at `web.dpi`, JPEG `web.quality`, linearized |
 | image | `<slug>-v<N>-rgb-<w>x<h>px[-p<n>].png` / `.jpg` | raster of every page (pdfium render of an RGB build, trim only, bleed ignored; JPG q92 4:4:4) |
-Versioning: iterate on the same `version`; bump when a new version goes to the client. A full run cleans only this slug's files in `dist/v<N>/` (older versions stay); `--target` replaces only its own files. Hyphens only, lowercase, no accents in names. print + web = four files, in seconds.
+Versioning: iterate on the same `version`; bump when a new version goes to the client. A full run cleans only this slug's files of that version in `dist/` (older versions stay); `--target` replaces only its own files. Hyphens only, lowercase, no accents in names. print + web = four files, in seconds.
 
 ## 4. Technical rules
 - Text stays VECTOR with embedded fonts, one line = one text object (editable in Affinity/Illustrator/Acrobat). Ship the fonts. Find fonts in /usr/share/fonts, else raw.githubusercontent.com/google/fonts/main/ofl/<FONT>/. FOGRA39 profile: /usr/share/texlive/texmf-dist/tex/generic/colorprofiles/FOGRA39L_coated.icc (copy into assets/profiles).

@@ -41,7 +41,7 @@ def main():
     with open(os.path.join(dest, "content.yaml"), "w", encoding="utf-8") as f:
         f.write(text)
     print(f"Created designs/{args.name}/ from designs/{src}/  (slug: {slug})")
-    print(f"Edit its content.yaml and draw(), then:  python3 designs/{args.name}/build.py   ->  designs/{args.name}/dist/v1/")
+    print(f"Edit its content.yaml and draw(), then:  python3 designs/{args.name}/build.py   ->  designs/{args.name}/dist/")
 
 
 if __name__ == "__main__":

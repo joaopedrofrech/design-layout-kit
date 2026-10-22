@@ -20,17 +20,19 @@ DESIGNS = os.path.join(BASE, "designs")
 
 
 def pack(names):
-    """Zip dist/v<version>/ of each design into exports/<kit>-<date>.zip. Returns the zip path."""
+    """Zip the current version's files in dist/ of each design into exports/<kit>-<date>.zip. Returns the zip path."""
     kit = os.path.basename(BASE)
     out = os.path.join(BASE, "exports", f"{kit}-{datetime.date.today().isoformat()}.zip")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         for n in names:
             with open(os.path.join(DESIGNS, n, "content.yaml"), encoding="utf-8") as f:
-                version = (yaml.safe_load(f) or {}).get("version", 1)
-            folder = os.path.join(DESIGNS, n, "dist", f"v{version}")
+                D = yaml.safe_load(f) or {}
+            folder = os.path.join(DESIGNS, n, "dist")
+            prefix = f"{D['slug']}-v{D.get('version', 1)}-"
             for fn in sorted(os.listdir(folder)):
-                z.write(os.path.join(folder, fn), f"{kit}/{n}/{fn}")
+                if fn.startswith(prefix):
+                    z.write(os.path.join(folder, fn), f"{kit}/{n}/{fn}")
     return out
 
 

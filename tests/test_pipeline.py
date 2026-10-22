@@ -47,7 +47,7 @@ def build(proj, *args, design="main"):
 
 
 def pdfs(proj, version=1, design="main"):
-    return sorted(glob.glob(os.path.join(proj, "designs", design, "dist", f"v{version}", "*.pdf")))
+    return sorted(glob.glob(os.path.join(proj, "designs", design, "dist", f"*-v{version}-*.pdf")))
 
 
 def pick(files, tail):
@@ -201,7 +201,7 @@ class MultiDesign(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         r = build(self.proj, "--target", "web", design="flyer")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        got = sorted(os.listdir(os.path.join(self.proj, "designs", "flyer", "dist", "v1")))
+        got = sorted(os.listdir(os.path.join(self.proj, "designs", "flyer", "dist")))
         self.assertEqual(got, ["acme-flyer-a5-v1-rgb-150dpi-web.pdf", "acme-flyer-a5-v1-rgb-300dpi.pdf"])
         self.assertFalse(os.path.exists(os.path.join(self.proj, "designs", "main", "dist")))   # other design untouched
 

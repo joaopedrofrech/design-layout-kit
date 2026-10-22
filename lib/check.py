@@ -2,7 +2,7 @@
 """
 Structural checks for a generated PDF.
 
-    python3 lib/check.py dist/v1/*.pdf [--mode cmyk|rgb] [--min-dpi 299] [--max-dpi 151]
+    python3 lib/check.py dist/*.pdf [--mode cmyk|rgb] [--min-dpi 299] [--max-dpi 151]
 
 Checks: pages, encryption, fonts embedded, vector text present (page not rasterized),
 Unicode map on every font (accents stay extractable), color (cmyk: no RGB operators or

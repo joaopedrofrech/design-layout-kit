@@ -11,7 +11,7 @@ Starter for **design-layout-kit**: a project template for designs (PDF, PNG, JPG
 - print: CMYK (FOGRA39), 300 dpi, plus a PDF/X-1a for the printer;
 - web: sRGB, a pure 300 dpi file plus a light 150 dpi optimized one.
 
-Every output is checked automatically, and each delivery gets its own versioned folder (`dist/v1/`, `dist/v2/`, …).
+Every output is checked automatically, and each delivery version is kept side by side in `dist/` (`…-v1-…`, `…-v2-…`).
 
 ## How to edit
 Most changes only touch a design's `content.yaml`; the layout stays untouched. Two ways, same result:
@@ -26,7 +26,7 @@ kit-<client>[-<project>]/
     <design>/                    e.g. menu-a4, flyer-a5 (one folder per piece)
       content.yaml            texts, prices, photos, size, targets, version
       build.py                the layout (draw)
-      dist/v1/                generated PDFs of this design
+      dist/                   generated files of this design (all versions)
   brand.yaml                  shared: author, client, lang, colors, web settings
   assets/{originals,images,fonts,profiles}/    shared files
   lib/                        the pipeline (do not edit per project)
@@ -41,11 +41,11 @@ The starter ships with one design, `designs/main/`: rename the folder to the pie
 pip install -r requirements.txt
 python3 designs/main/build.py                 # every target of the design
 python3 designs/main/build.py --target web    # one run, only that target (print | web | image)
-python3 designs/main/build.py --bump          # version += 1 (new dist/v<N>/ folder), then build
+python3 designs/main/build.py --bump          # version += 1 (new `-v<N>-` files in dist/), then build
 python3 build_all.py                       # every design of the kit (--only a,b  --target web)
 python3 build_all.py --zip                 # build everything, then pack exports/<kit>-<date>.zip
 python3 prep.py                            # prepare images (assets/originals -> assets/images)
-python3 lib/check.py designs/main/dist/v1/*.pdf   # re-check any generated PDF
+python3 lib/check.py designs/main/dist/*-v1-*.pdf   # re-check any generated PDF
 python3 -m unittest                        # test suite (~50 s)
 ```
 
@@ -65,7 +65,7 @@ Background removal, real upscaling and image generation are done by the AI agent
 `page:` in the design's `content.yaml` takes a preset (`a3`, `a4`, `a5`, `a6`, `letter`, `legal`, add `-landscape` to rotate), a size with unit (`"210x297mm"`, `"1080x1350px"`) or `{width_mm, height_mm}`. A pixel page is 1 px = 1 pt, so it renders 1:1: a social post is just `page: "1080x1350px"`.
 
 ## Outputs
-Files go to `designs/<design>/dist/v<version>/`, named `<slug>-v<version>-<color>-<dpi>dpi[-<variant>].pdf`.
+Files go to `designs/<design>/dist/`, named `<slug>-v<version>-<color>-<dpi>dpi[-<variant>].pdf`.
 A full run cleans only that slug's files of the current version; older versions stay. `--target` replaces only its own files.
 
 | target | file | use |
@@ -81,7 +81,7 @@ The `image` target renders the design to PNG and/or JPG (trim area only, bleed i
 Every output is checked right after the build (fonts embedded, vector text present, accents extractable, CMYK-only for print, image dpi; the PDF behind PNG/JPG is checked too). The build stops if a check fails.
 
 ## Versions
-`version:` in the design's `content.yaml` is the delivery version. Keep working on the same version while iterating (builds overwrite `dist/v<N>/`); bump it when you send a new version to the client. Commit `dist/` only when you want those PDFs in git (a CMYK menu is ~12 MB per version).
+`version:` in the design's `content.yaml` is the delivery version. Keep working on the same version while iterating (a full build replaces only that version's files in `dist/`); bump it when you send a new version to the client. Commit `dist/` only when you want those PDFs in git (a CMYK menu is ~12 MB per version).
 
 ## Bleed
 `bleed_mm: 3` makes the PDF page larger (trim + 3 mm each side) with the origin at the trim corner. `draw()` keeps using `ctx.page_size` (trim size); extend full-page backgrounds by `ctx.bleed`. X-1a gets `TrimBox`/`BleedBox` accordingly. Crop marks are not drawn (printers add them).

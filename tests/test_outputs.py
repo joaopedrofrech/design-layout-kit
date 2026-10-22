@@ -16,7 +16,7 @@ from lib.core import MM, base_errors, parse_page, rasterize  # noqa: E402
 
 
 def dist(proj, design="main", version=1):
-    return os.path.join(proj, "designs", design, "dist", f"v{version}")
+    return os.path.join(proj, "designs", design, "dist")
 
 
 def names(proj, design="main"):

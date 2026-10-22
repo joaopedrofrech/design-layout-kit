@@ -19,7 +19,7 @@ ctx (passed to draw):
                      `page` in content.yaml: {width_mm,height_mm}, a preset (a4, a5-landscape, letter), "210x297mm" or "1080x1350px"
     ctx.bleed        bleed in points (0 by default); with bleed_mm > 0 the PDF page is larger and the origin
                      is already shifted, so extend full-page backgrounds by ctx.bleed on every side
-    ctx.version      project version (content.yaml `version`), outputs go to dist/v<version>/
+    ctx.version      project version (content.yaml `version`), outputs go to dist/ (version is in the file name)
 """
 import argparse
 import glob
@@ -310,7 +310,7 @@ def run(draw, base_dir, font, validate=None):
     ap.add_argument("--content", default=os.path.join(base_dir, "content.yaml"),
                     help="content file (default content.yaml); another file = a variation with the same layout")
     ap.add_argument("--bump", action="store_true",
-                    help="increase `version` in the content file first (new dist/v<N>/ folder)")
+                    help="increase `version` in the content file first (new -v<N>- files in dist/)")
     args = ap.parse_args()
     kit = kit_root(base_dir)
 
@@ -325,7 +325,7 @@ def run(draw, base_dir, font, validate=None):
     ctx = Ctx(D, base_dir, kit)
     if not D.get("author"):
         print("  • 'author' is empty (brand.yaml or content.yaml): ask who signs the file.")
-    dist = os.path.join(base_dir, "dist", f"v{ctx.version}")
+    dist = os.path.join(base_dir, "dist")
     os.makedirs(dist, exist_ok=True)
     stem = f"{glob.escape(D['slug'])}-v{ctx.version}-"
     img_files = lambda: [f for ext in ("png", "jpg") for f in glob.glob(os.path.join(dist, f"{stem}rgb-*px*.{ext}"))]
@@ -382,6 +382,6 @@ def run(draw, base_dir, font, validate=None):
             if not ok:
                 sys.exit("PDF/X-1a check failed — see report above.")
 
-    print(f"\nFiles in dist/v{ctx.version}/:")
+    print("\nFiles in dist/:")
     for p in made:
         print(f"  {os.path.getsize(p) / 1e6:6.2f} MB   {os.path.basename(p)}")
